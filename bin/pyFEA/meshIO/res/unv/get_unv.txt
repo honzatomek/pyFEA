@@ -1,0 +1,22 @@
+curl 'https://www.ceas3.uc.edu/sdrluff/view.php' \
+  -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9' \
+    -H 'Accept-Language: cs-CZ,cs;q=0.9,en;q=0.8,fr;q=0.7' \
+      -H 'Cache-Control: max-age=0' \
+        -H 'Connection: keep-alive' \
+          -H 'Content-Type: application/x-www-form-urlencoded' \
+            -H 'Cookie: lhnStorageType=cookie; lhnRefresh=66a03fd7-dfbd-4cd7-9fc9-3744b22256d2; lhnJWT=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ2aXNpdG9yIiwiZG9tYWluIjoiIiwiZXhwIjoxNjYzNTI0NjU5LCJpYXQiOjE2NjM0MzgyNTksImlzcyI6eyJhcHAiOiJqc19zZGsiLCJjbGllbnQiOjM3ODE5LCJjbGllbnRfbGV2ZWwiOiJiYXNpYyIsImxobnhfZmVhdHVyZXMiOltdLCJ2aXNpdG9yX3RyYWNraW5nIjp0cnVlfSwianRpIjoiY2IzYmJkMTAtNmY3Yy00ZmNiLWExNjQtNGVkNTYyNDZlZTliIiwicmVzb3VyY2UiOnsiaWQiOiJjYjNiYmQxMC02ZjdjLTRmY2ItYTE2NC00ZWQ1NjI0NmVlOWItMzc4MTktblFGUVE1ZSIsInR5cGUiOiJFbGl4aXIuTGhuRGIuTW9kZWwuQ29yZS5WaXNpdG9yIn19.WCB50w_8BLuM5rHfl525uDYDf718aPHhmTqe6_dqTHY; lhnContact=cb3bbd10-6f7c-4fcb-a164-4ed56246ee9b-37819-nQFQQ5e' \
+              -H 'DNT: 1' \
+                -H 'Origin: https://www.ceas3.uc.edu' \
+                  -H 'Referer: https://www.ceas3.uc.edu/sdrluff/all_files.php' \
+                    -H 'Sec-Fetch-Dest: document' \
+                      -H 'Sec-Fetch-Mode: navigate' \
+                        -H 'Sec-Fetch-Site: same-origin' \
+                          -H 'Sec-Fetch-User: ?1' \
+                            -H 'Upgrade-Insecure-Requests: 1' \
+                              -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36' \
+                                -H 'sec-ch-ua: ".Not/A)Brand";v="99", "Google Chrome";v="103", "Chromium";v="103"' \
+                                  -H 'sec-ch-ua-mobile: ?0' \
+                                    -H 'sec-ch-ua-platform: "Windows"' \
+                                      -H 'sec-gpc: 1' \
+                                        --data-raw 'fName=206.asc' \
+                                          --compressed
