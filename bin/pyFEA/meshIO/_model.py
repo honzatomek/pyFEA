@@ -1,3 +1,52 @@
+"""
+TODO:
+
+1.   generic kewyword for type, maybe keyword? (e.g. Coor, Element, CLoad, MaterialISO')
+         keyword ?
+         obj_type  - too bad
+         command
+         cmd
+         spec
+         tp
+         otype - similar to numpy dtype, might not be too bad
+         fetype - maybe best
+
+2.   elemental and nodal loading just one class?
+         Load - fetype (Conload, Disload, CTempload, DTempload) ????
+              - id (node / element)
+              - load vector 1, 3, 6 components (CTempload, Force, Moment ...)
+
+3.   loading variant
+
+4.   constraint variant
+         - only nodal constraints - Constraint,
+         - both suppressed and prescribed the same
+         - when suppressed, all suppressed values set to zero,
+         - needs to be taken into consideration when numbering DOFs
+
+         Constraint - fetype (Suppressed, Prescribed)
+                    - id (node)
+                    - dof - value
+                    - dof - value
+                          .
+                          .
+                          .
+
+5.   structure variant
+
+6.   results variant
+
+7.   model
+
+8.   situation
+
+9.   sets - nodal/elemental
+
+10.  csys - cartesian/cylindrical
+
+
+"""
+
 try:
     from typing import Self
 except ImportError:
@@ -10,6 +59,10 @@ import scipy.sparse
 import scipy.interpolate.interpnd
 
 from rich.console import Console
+
+
+
+
 
 
 element_type = {
@@ -673,43 +726,43 @@ class Nodes(ContainerDict):
 
 
 class Element(Id):
-    def __init__(self, eid: int, etype: str, nodes: [list | tuple | ArrayLike]):
+    def __init__(self, eid: int, fetype: str, nodes: [list | tuple | ArrayLike]):
         super().__init__(eid)
-        self.type = etype
+        self.fetype = fetype
         self.nodes = nodes
 
     def __repr__(self) -> str:
         lines = [f"<Element object>",
                  f"  ID: {self.id:n}",
-                 f"  Type: {self.type:s}",
+                 f"  Type: {self.fetype:s}",
                  f"  Nodes: {self.count:n}"]
         return "\n".join(lines)
 
     def __str__(self) -> str:
-        return f"{self.type:s} Element ID {self.id:n}"
+        return f"{self.fetype:s} Element ID {self.id:n}"
 
     def __len__(self) -> int:
         return self.count
 
     @property
-    def type(self) -> str:
+    def fetype(self) -> str:
         return self._type
 
-    @type.setter
-    def type(self, etype: str):
-        if type(etype) is not str:
-            message = (f"Element {self.id:n} type {str(etype):s} must be a str, " +
-                       f"not {str(type(etype).__name__):s}.")
+    @fetype.setter
+    def fetype(self, fetype: str):
+        if type(fetype) is not str:
+            message = (f"Element {self.id:n} type {str(fetype):s} must be a str, " +
+                       f"not {str(type(fetype).__name__):s}.")
             Error(message)
             raise TypeError(message)
-        elif etype.upper() not in element_type.keys():
-            message = (f"Element {self.id:n} type {str(etype):s} not found in " +
+        elif fetype.upper() not in element_type.keys():
+            message = (f"Element {self.id:n} type {str(fetype):s} not found in " +
                        f"not ({', '.join(list(element_type.keys())):s}).")
             Warn(message)
             self._len = None
         else:
-            self._len = int(element_type[etype])
-        self._type = etype.upper()
+            self._len = int(element_type[fetype])
+        self._type = fetype.upper()
 
     @property
     def count(self) -> int:
@@ -733,11 +786,11 @@ class Element(Id):
         nodes = list(nodes)
         if self._len is None:
             message = (f"Assigning {len(nodes):n} Nodes to Element {self.id:n} " +
-                       f"of unknown type {self.type:s}.")
+                       f"of unknown type {self.fetype:s}.")
             Info(message)
             self._len = len(nodes)
         elif self._len is not None and self._len != len(nodes):
-            message = (f"Element {self.id:n} type {self.type:s} must have " +
+            message = (f"Element {self.id:n} type {self.fetype:s} must have " +
                        f"{self._len:n} nodes, not {len(nodes):n}.")
             Error(message)
             raise ValueError(message)
@@ -793,15 +846,15 @@ class Elements(ContainerDict):
     def aslist(self) -> list:
         elements = []
         for eid, element in self.elements.items():
-            # elements.append([eid, element.type, *element.nodes])
-            elements.append([eid, element.type, *element.nodes])
+            # elements.append([eid, element.fetype, *element.nodes])
+            elements.append([eid, element.fetype, *element.nodes])
         return elements
 
     def asdict(self) -> dict:
         elements = {}
         for eid, element in self.elements.items():
-            # elements.setdefault(eid, [element.type, *element.nodes])
-            elements.setdefault(eid, {"eid": eid, "etype": element.type, "nodes": element.nodes})
+            # elements.setdefault(eid, [element.fetype, *element.nodes])
+            elements.setdefault(eid, {"eid": eid, "fetype": element.fetype, "nodes": element.nodes})
         return elements
 
     # TODO:
@@ -953,18 +1006,18 @@ class Material(Name):
             return np.interp(temperature, values[:,0], values[:,1])
 
     @classmethod
-    def New(cls, name: str, mtype: str, *args, **kwargs):
-        if type(mtype) is not str:
-            message = f"Material type must be a str, not {str(type(mtype).__name__):s}."
+    def New(cls, name: str, fetype: str, *args, **kwargs):
+        if type(fetype) is not str:
+            message = f"Material type must be a str, not {str(type(fetype).__name__):s}."
             Error(message)
             raise TypeError(message)
-        elif mtype not in cls.__types:
-            message = f"Material type {str(mtype):s} not implemented."
+        elif fetype not in cls.__types:
+            message = f"Material type {str(fetype):s} not implemented."
             Error(message)
             raise ValueError(message)
 
         if len(args) > 0 or len(kwargs) > 0:
-            if mtype == "ISO":
+            if fetype == "ISO":
                 if len(args) > 1:
                     return MaterialISO(name, *args)
                 elif len(args) == 1:
@@ -995,30 +1048,30 @@ class Material(Name):
             Error(message)
             raise ValueError(message)
 
-    def __init__(self, name: str, mtype: str, *args, **kwargs):
+    def __init__(self, name: str, fetype: str, *args, **kwargs):
         super().__init__(name)
-        self.type = mtype
+        self.fetype = fetype
 
     def __repr__(self) -> str:
-        return f"<{str(type(self).__name__):s} object>\n  Name: {self.name:s}\n  Type: {self.type:s}"
+        return f"<{str(type(self).__name__):s} object>\n  Name: {self.name:s}\n  Type: {self.fetype:s}"
 
     @property
-    def type(self) -> str:
+    def fetype(self) -> str:
         return self._type
 
-    @type.setter
-    def type(self, mtype: str):
-        if type(mtype) is not str:
-            message = f"Material type must be a str, not {str(type(mtype).__name__):s}."
+    @fetype.setter
+    def fetype(self, fetype: str):
+        if type(fetype) is not str:
+            message = f"Material type must be a str, not {str(type(fetype).__name__):s}."
             Error(message)
             raise TypeError(message)
-        elif mtype not in self.__types:
+        elif fetype not in self.__types:
             message = (f"Material type must be one of ({', '.join(self.__types):s}), " +
-                       f"not {str(mtype):s}.")
+                       f"not {str(fetype):s}.")
             Error(message)
             raise TypeError(message)
         else:
-            self._type = mtype
+            self._type = fetype
 
 
 # TODO:
@@ -1134,7 +1187,7 @@ class MaterialISO(Material):
         return self._interpolate(temperature, self.shear)
 
     def aslist(self) -> list:
-        material = [self.name, self.type]
+        material = [self.name, self.fetype]
         for prop in (self.young, self.poisson, self.density, self.thermal_expansion, self.shear):
             if type(prop) is np.ndarray:
                 material.append(prop.tolist())
@@ -1143,7 +1196,7 @@ class MaterialISO(Material):
         return material
 
     def asdict(self) -> dict:
-        material = {"name": self.name, "type": self.type}
+        material = {"name": self.name, "fetype": self.fetype}
         for name, prop in zip(("E", "nu", "rho", "alpha", "G"),
                 (self.young, self.poisson, self.density, self.thermal_expansion, self.shear)):
             if type(prop) is np.ndarray:
@@ -1257,15 +1310,15 @@ class Materials(ContainerDict):
     def aslist(self) -> list:
         materials = []
         for mname, material in self.materials.items():
-            # elements.append([eid, element.type, *element.nodes])
-            materials.append([mname, material.type, material.aslist()])
+            # elements.append([eid, element.fetype, *element.nodes])
+            materials.append([mname, material.fetype, material.aslist()])
         return materials
 
     def asdict(self) -> dict:
         materials = {}
         for mname, material in self.materials.items():
-            # elements.setdefault(eid, [element.type, *element.nodes])
-            materials.setdefault(mname, [material.type, material.aslist()])
+            # elements.setdefault(eid, [element.fetype, *element.nodes])
+            materials.setdefault(mname, [material.fetype, material.aslist()])
         return materials
 
 
@@ -1292,62 +1345,62 @@ class Property(Name):
         return value
 
     @classmethod
-    def New(cls, name: str, ptype: str, *args, **kwargs):
-        if type(ptype) is not str:
+    def New(cls, name: str, fetype: str, *args, **kwargs):
+        if type(fetype) is not str:
             message = (f"Property {name:s} type must be a str, " +
-                       f"not {str(type(ptype).__name__):s}.")
+                       f"not {str(type(fetype).__name__):s}.")
             Error(message)
             raise TypeError(message)
-        elif ptype not in cls.__types:
+        elif fetype not in cls.__types:
             message = (f"Property {name:s} type must be one of " +
-                       f"{', '.join(cls.__types):s}, not {str(ptype):s}.")
+                       f"{', '.join(cls.__types):s}, not {str(fetype):s}.")
             Error(message)
             raise ValueError(message)
         else:
-            if ptype == "MASS":
+            if fetype == "MASS":
                 p = PMass(name, *args, **kwargs)
-            elif ptype == "ROD":
+            elif fetype == "ROD":
                 p = PRod(name, *args, **kwargs)
-            elif ptype == "BEAM":
+            elif fetype == "BEAM":
                 p = PBeam(name, *args, **kwargs)
-            elif ptype == "SHELL":
+            elif fetype == "SHELL":
                 p = PShell(name, *args, **kwargs)
-            elif ptype == "TRIA3":
+            elif fetype == "TRIA3":
                 p = PTria3(name, *args, **kwargs)
-            elif ptype == "TRIA6":
+            elif fetype == "TRIA6":
                 p = PTria6(name, *args, **kwargs)
-            elif ptype == "QUAD4":
+            elif fetype == "QUAD4":
                 p = PQuad4(name, *args, **kwargs)
-            elif ptype == "QUAD8":
+            elif fetype == "QUAD8":
                 p = PQuad8(name, *args, **kwargs)
-            elif ptype == "SOLID":
+            elif fetype == "SOLID":
                 p = PSolid(name, *args, **kwargs)
             return p
 
-    def __init__(self, name: str, ptype: str):
+    def __init__(self, name: str, fetype: str):
         super().__init__(name)
-        self.type = ptype
+        self.fetype = fetype
 
     def __repr__(self) -> str:
-        return f"<{str(type(self).__name__):s} object>\n  Name: {self.name:s}\n  Type: {self.type:s}"
+        return f"<{str(type(self).__name__):s} object>\n  Name: {self.name:s}\n  Type: {self.fetype:s}"
 
     @property
-    def type(self) -> str:
+    def fetype(self) -> str:
         return self._type
 
-    @type.setter
-    def type(self, ptype: str):
-        if type(ptype) is not str:
-            message = f"Property type must be a str, not {str(type(ptype).__name__):s}."
+    @fetype.setter
+    def fetype(self, fetype: str):
+        if type(fetype) is not str:
+            message = f"Property type must be a str, not {str(type(fetype).__name__):s}."
             Error(message)
             raise TypeError(message)
-        elif ptype not in self.__types:
+        elif fetype not in self.__types:
             message = (f"Property type must be one of ({', '.join(self.__types):s}), " +
-                       f"not {str(ptype):s}.")
+                       f"not {str(fetype):s}.")
             Error(message)
             raise TypeError(message)
         else:
-            self._type = ptype
+            self._type = fetype
 
 
 class PMass(Property):
@@ -1378,19 +1431,19 @@ class PMass(Property):
     @mass.setter
     def mass(self, M: [list | tuple | ArrayLike]):
         if type(M) not in (list, tuple, np.ndarray):
-            message = (f"{self.type:s} Property {self.name:s} values must be one of " +
+            message = (f"{self.fetype:s} Property {self.name:s} values must be one of " +
                        f" list, tuple or np.ndarray, not {str(type(M).__name__):s}.")
             Error(message)
             raise TypeError(message)
 
         M = np.array(M, dtype=float).flatten()
         if len(M) not in  (3, 9):
-            message = (f"{self.type:s} Property {self.name:s} values must be of length 3, or 9, " +
+            message = (f"{self.fetype:s} Property {self.name:s} values must be of length 3, or 9, " +
                        f"[m_xx, m_yy, m_zz [, I_xx, I_yy, I_zz, I_xy, I_yz, I_xz]] not {len(M):n}.")
             Error(message)
             raise ValueError(message)
         elif any([m < 0. for m in M[:6]]):
-            message = (f"{self.type:s} Property {self.name:s} values must be >= 0.," +
+            message = (f"{self.fetype:s} Property {self.name:s} values must be >= 0.," +
                        f" not {str(M):n}.")
             Error(message)
             raise ValueError(message)
@@ -1414,10 +1467,10 @@ class PMass(Property):
         return M
 
     def aslist(self):
-        return [self.name, self.type, *list(self.mass)]
+        return [self.name, self.fetype, *list(self.mass)]
 
     def asdict(self):
-        property = {"name": self.name, "ptype": self.type}
+        property = {"name": self.name, "fetype": self.fetype}
         if len(self.mass) == 3:
             for i, key in enumerate(["mxx", "myy", "mzz"]):
                 property.setdefault(key, self.mass[i])
@@ -1458,10 +1511,10 @@ class PRod(Property):
         return (self.A * r + self.nsm) * l
 
     def aslist(self):
-        return [self.name, self.type, self.A, self.nsm]
+        return [self.name, self.fetype, self.A, self.nsm]
 
     def asdict(self):
-        property = {"name": self.name, "ptype": self.type, "A": self.A, "nsm": self.nsm}
+        property = {"name": self.name, "fetype": self.fetype, "A": self.A, "nsm": self.nsm}
         return property
 
 
@@ -1516,10 +1569,10 @@ class PBeam(Property):
         self._nsm = self._check_value("Nonstructural Mass", nsm, True)
 
     def aslist(self):
-        return [self.name, self.type, self.A, self.Iyy, self.Izz, self.Iw, self.nsm]
+        return [self.name, self.fetype, self.A, self.Iyy, self.Izz, self.Iw, self.nsm]
 
     def asdict(self):
-        property = {"name": self.name, "ptype": self.type, "A": self.A,
+        property = {"name": self.name, "fetype": self.fetype, "A": self.A,
                     "Iyy": self.Iyy, "Izz": self.Izz, "Iw": self.Iw,
                     "nsm": self.nsm}
         return property
@@ -1527,12 +1580,12 @@ class PBeam(Property):
 
 class PShell(Property):
     def __init__(self, name: str, t: [float | tuple | list | ArrayLike],
-                 nsm: float = None, ptype: str = None, num_nodes: int = 1):
-        if ptype is None:
+                 nsm: float = None, fetype: str = None, num_nodes: int = 1):
+        if fetype is None:
             super().__init__(name, "SHELL")
             self.__n = len(t) if type(t) in (tuple, list, np.ndarray) else 1
         else:
-            super().__init__(name, ptype)
+            super().__init__(name, fetype)
             self.__n = num_nodes
         self.t = t
         self.nsm = (nsm if nsm is not None else 0.)
@@ -1553,19 +1606,19 @@ class PShell(Property):
         elif type(t) is np.ndarray:
             t = t.tolist()
         else:
-            message = (f"{self.type:s} Property {self.name:s} thickness must be one of " +
+            message = (f"{self.fetype:s} Property {self.name:s} thickness must be one of " +
                        f"(float, tuple, list, np.ndarray), not {str(type(t).__name__):s}.")
             Error(message)
             raise TypeError(message)
 
         if t[0] is None:
-            message = (f"{self.type:s} Property {self.name:s} t1 must be a float, " +
+            message = (f"{self.fetype:s} Property {self.name:s} t1 must be a float, " +
                        f"not {str(t[0]):s}.")
             Error(message)
             raise TypeError(message)
 
         if len(t) != self.__n:
-            message = (f"{self.type:s} Property {self.name:s} thickness must be a list " +
+            message = (f"{self.fetype:s} Property {self.name:s} thickness must be a list " +
                        f"of len {self.__n:n}, not {len(t):s}.")
             Error(message)
             raise TypeError(message)
@@ -1574,7 +1627,7 @@ class PShell(Property):
         # for i, tt in enumerate(t):
         #     if tt is None:
         #         t[i] = t[0]
-        #         Info(f"{type(self).__name__:s} {self.name:s} thickness {i + 1:n} set to t1 " +
+        #         Info(f"{fetype(self).__name__:s} {self.name:s} thickness {i + 1:n} set to t1 " +
         #              f"({t[0]:f}).")
         self._t = np.array([self._check_value(f"Thickness {i+1:n}", t[i]) for i in range(len(t))],
                            dtype=float)
@@ -1589,12 +1642,12 @@ class PShell(Property):
 
     def aslist(self):
         if type(self.t) in (float, np.float64, np.float128):
-            return [self.name, self.type, self.t, self.nsm]
+            return [self.name, self.fetype, self.t, self.nsm]
         else:
-            return [self.name, self.type, *self.t, self.nsm]
+            return [self.name, self.fetype, *self.t, self.nsm]
 
     def asdict(self):
-        property = {"name": self.name, "ptype": self.type, "nsm": self.nsm}
+        property = {"name": self.name, "fetype": self.fetype, "nsm": self.nsm}
         # print(f"{self.t = }")
         if type(self.t) in (float, np.float64, np.float128):
             property.setdefault("t", self.t)
@@ -1648,10 +1701,10 @@ class PSolid(Property):
         self._nsm = self._check_value("Nonstructural Mass", nsm, True)
 
     def aslist(self):
-        return [self.name, self.type, self.nsm]
+        return [self.name, self.fetype, self.nsm]
 
     def asdict(self):
-        property = {"name": self.name, "ptype": self.type, "nsm": self.nsm}
+        property = {"name": self.name, "fetype": self.fetype, "nsm": self.nsm}
         return property
 
 
@@ -1706,19 +1759,19 @@ class Properties(ContainerDict):
     def aslist(self) -> list:
         properties = []
         for name, property in self.properties.items():
-            properties.append([name, property.type, property.aslist()])
+            properties.append([name, property.fetype, property.aslist()])
         return properties
 
     def asdict(self) -> dict:
         properties = {}
         for name, property in self.properties.items():
-            properties.setdefault(name, [property.type, property.aslist()])
+            properties.setdefault(name, [property.fetype, property.aslist()])
         return properties
 
 
 # TODO:
 class CLoad(Id):
-    def __init__(self, nid: int, lpat: int,
+    def __init__(self, fetype: str, nid: int, lpat: int,
                  Fx: float = None, Fy: float = None, Fz: float = None,
                  Mx: float = None, My: float = None, Mz: float = None):
         super().__init__(nid)

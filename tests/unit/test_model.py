@@ -481,23 +481,23 @@ class TestElement:
     @pytest.mark.parametrize("model", models)
     def test_init_(self, model):
         nds = model["nodes"]
-        etype = model["elements"][0]
+        fetype = model["elements"][0]
         elements = model["elements"][1]
 
         for i, nodes in enumerate(elements):
-            element = Element(i + 1, etype=etype, nodes=nodes)
+            element = Element(i + 1, fetype=fetype, nodes=nodes)
             assert i + 1 == element.id
-            assert etype == element.type
+            assert fetype == element.fetype
             assert len(nodes) == element.count
             assert len(nodes) == len(element)
             assert nodes == element.nodes
-            assert repr(element) == f"<Element object>\n  ID: {i+1:n}\n  Type: {etype:s}\n  Nodes: {len(nodes):n}"
-            assert str(element) == f"{etype:s} Element ID {i+1:n}"
+            assert repr(element) == f"<Element object>\n  ID: {i+1:n}\n  Type: {fetype:s}\n  Nodes: {len(nodes):n}"
+            assert str(element) == f"{fetype:s} Element ID {i+1:n}"
 
     def test_etype(self):
         element = Element(1001, "custom_hex27", list(range(1, 28)))
         assert element.id == 1001
-        assert element.type == "CUSTOM_HEX27"
+        assert element.fetype == "CUSTOM_HEX27"
         assert len(element) == 27
         assert element.count == 27
         assert str(element) == "CUSTOM_HEX27 Element ID 1001"
@@ -508,11 +508,11 @@ class TestElements:
     @pytest.mark.parametrize("model", models)
     def test_init_list(self, model):
         nds = model["nodes"]
-        etype = model["elements"][0]
+        fetype = model["elements"][0]
         elenodes = model["elements"][1]
         els = []
         for eid in range(len(elenodes)):
-            els.append([eid + 1, etype, *elenodes[eid]])
+            els.append([eid + 1, fetype, *elenodes[eid]])
 
         elements = Elements(els)
         assert elements.count == len(elenodes)
@@ -522,11 +522,11 @@ class TestElements:
     @pytest.mark.parametrize("model", models)
     def test_init_list_Elements(self, model):
         nds = model["nodes"]
-        etype = model["elements"][0]
+        fetype = model["elements"][0]
         elenodes = model["elements"][1]
         els = []
         for eid in range(len(elenodes)):
-            els.append(Element(eid + 1, etype, elenodes[eid]))
+            els.append(Element(eid + 1, fetype, elenodes[eid]))
 
         elements = Elements(els)
         assert elements.count == len(elenodes)
@@ -535,11 +535,11 @@ class TestElements:
     @pytest.mark.parametrize("model", models)
     def test_init_dict(self, model):
         nds = model["nodes"]
-        etype = model["elements"][0]
+        fetype = model["elements"][0]
         elenodes = model["elements"][1]
         els = {}
         for eid in range(len(elenodes)):
-            els.setdefault(eid + 1, {"eid": eid + 1, "etype": etype, "nodes": elenodes[eid]})
+            els.setdefault(eid + 1, {"eid": eid + 1, "fetype": fetype, "nodes": elenodes[eid]})
 
         elements = Elements(els)
         assert elements.count == len(elenodes)
@@ -549,11 +549,11 @@ class TestElements:
     @pytest.mark.parametrize("model", models)
     def test_init_dict_Elements(self, model):
         nds = model["nodes"]
-        etype = model["elements"][0]
+        fetype = model["elements"][0]
         elenodes = model["elements"][1]
         els = {}
         for eid in range(len(elenodes)):
-            els.setdefault(eid + 1, Element(eid + 1, etype, elenodes[eid]))
+            els.setdefault(eid + 1, Element(eid + 1, fetype, elenodes[eid]))
 
         elements = Elements(els)
         assert elements.count == len(elenodes)
@@ -563,21 +563,21 @@ class TestElements:
     @pytest.mark.parametrize("model2", models)
     def test_init_multiple_types(self, model1, model2):
         nds = model1["nodes"]
-        etype = model1["elements"][0]
+        fetype = model1["elements"][0]
         elenodes = model1["elements"][1]
 
         els = []
         for eid in range(len(elenodes)):
-            els.append(Element(eid + 1, etype, elenodes[eid]))
+            els.append(Element(eid + 1, fetype, elenodes[eid]))
 
         model1_nds = len(nds)
         model1_els = len(els)
         nds.extend(model2["nodes"])
-        etype = model2["elements"][0]
+        fetype = model2["elements"][0]
         elenodes = [[n + model1_nds for n in nd] for nd in model2["elements"][1]]
 
         for eid in range(len(elenodes)):
-            els.append(Element(eid + model1_els + 1, etype, elenodes[eid]))
+            els.append(Element(eid + model1_els + 1, fetype, elenodes[eid]))
 
         elements = Elements(els)
         assert elements.count == len(model1["elements"][1]) + len(model2["elements"][1])
@@ -585,11 +585,11 @@ class TestElements:
     @pytest.mark.parametrize("model", models)
     def test_asdict(self, model):
         nds = model["nodes"]
-        etype = model["elements"][0]
+        fetype = model["elements"][0]
         elenodes = model["elements"][1]
         els = {}
         for eid in range(len(elenodes)):
-            els.setdefault(eid + 1, {"eid": eid + 1, "etype": etype, "nodes": elenodes[eid]})
+            els.setdefault(eid + 1, {"eid": eid + 1, "fetype": fetype, "nodes": elenodes[eid]})
 
         elements = Elements(els)
         assert elements.asdict() == els
@@ -597,11 +597,11 @@ class TestElements:
     @pytest.mark.parametrize("model", models)
     def test_aslist(self, model):
         nds = model["nodes"]
-        etype = model["elements"][0]
+        fetype = model["elements"][0]
         elenodes = model["elements"][1]
         els = []
         for eid in range(len(elenodes)):
-            els.append([eid + 1, etype, *elenodes[eid]])
+            els.append([eid + 1, fetype, *elenodes[eid]])
 
         elements = Elements(els)
         assert elements.aslist() == els
@@ -610,30 +610,30 @@ class TestElements:
     @pytest.mark.parametrize("model2", models)
     def test_add_(self, model1, model2):
         nds = model1["nodes"]
-        etype = model1["elements"][0]
+        fetype = model1["elements"][0]
         elenodes = model1["elements"][1]
 
         _els = {}
         els = {}
         for eid in range(len(elenodes)):
-            # _els.setdefault(eid + 1, [etype, elenodes[eid]])
-            # els.setdefault(eid + 1, [etype, elenodes[eid]])
-            _els.setdefault(eid + 1, {"eid": eid + 1, "etype": etype, "nodes": elenodes[eid]})
-            els.setdefault(eid + 1, {"eid": eid + 1, "etype": etype, "nodes": elenodes[eid]})
+            # _els.setdefault(eid + 1, [fetype, elenodes[eid]])
+            # els.setdefault(eid + 1, [fetype, elenodes[eid]])
+            _els.setdefault(eid + 1, {"eid": eid + 1, "fetype": fetype, "nodes": elenodes[eid]})
+            els.setdefault(eid + 1, {"eid": eid + 1, "fetype": fetype, "nodes": elenodes[eid]})
 
         elements1 = Elements(_els)
 
         nds = model2["nodes"]
-        etype = model2["elements"][0]
+        fetype = model2["elements"][0]
         elenodes = model2["elements"][1]
 
         _els = {}
         offset = len(els)
         for eid in range(len(elenodes)):
-            # _els.setdefault(eid + 1 + offset, [etype, elenodes[eid]])
-            # els.setdefault(eid + 1 + offset, [etype, elenodes[eid]])
-            _els.setdefault(eid + 1 + offset, {"eid": eid + 1 + offset, "etype": etype, "nodes": elenodes[eid]})
-            els.setdefault(eid + 1 + offset, {"eid": eid + 1 + offset, "etype": etype, "nodes": elenodes[eid]})
+            # _els.setdefault(eid + 1 + offset, [fetype, elenodes[eid]])
+            # els.setdefault(eid + 1 + offset, [fetype, elenodes[eid]])
+            _els.setdefault(eid + 1 + offset, {"eid": eid + 1 + offset, "fetype": fetype, "nodes": elenodes[eid]})
+            els.setdefault(eid + 1 + offset, {"eid": eid + 1 + offset, "fetype": fetype, "nodes": elenodes[eid]})
 
         elements2 = Elements(_els)
 
@@ -645,30 +645,30 @@ class TestElements:
     @pytest.mark.parametrize("model2", models)
     def test_iadd_(self, model1, model2):
         nds = model1["nodes"]
-        etype = model1["elements"][0]
+        fetype = model1["elements"][0]
         elenodes = model1["elements"][1]
 
         _els = {}
         els = {}
         for eid in range(len(elenodes)):
-            # _els.setdefault(eid + 1, [etype, elenodes[eid]])
-            # els.setdefault(eid + 1, [etype, elenodes[eid]])
-            _els.setdefault(eid + 1, {"eid": eid + 1, "etype": etype, "nodes": elenodes[eid]})
-            els.setdefault(eid + 1, {"eid": eid + 1, "etype": etype, "nodes": elenodes[eid]})
+            # _els.setdefault(eid + 1, [fetype, elenodes[eid]])
+            # els.setdefault(eid + 1, [fetype, elenodes[eid]])
+            _els.setdefault(eid + 1, {"eid": eid + 1, "fetype": fetype, "nodes": elenodes[eid]})
+            els.setdefault(eid + 1, {"eid": eid + 1, "fetype": fetype, "nodes": elenodes[eid]})
 
         elements = Elements(_els)
 
         nds = model2["nodes"]
-        etype = model2["elements"][0]
+        fetype = model2["elements"][0]
         elenodes = model2["elements"][1]
 
         _els = {}
         offset = len(els)
         for eid in range(len(elenodes)):
-            # _els.setdefault(eid + 1 + offset, [etype, elenodes[eid]])
-            # els.setdefault(eid + 1 + offset, [etype, elenodes[eid]])
-            _els.setdefault(eid + 1 + offset, {"eid": eid + 1 + offset, "etype": etype, "nodes": elenodes[eid]})
-            els.setdefault(eid + 1 + offset, {"eid": eid + 1 + offset, "etype": etype, "nodes": elenodes[eid]})
+            # _els.setdefault(eid + 1 + offset, [fetype, elenodes[eid]])
+            # els.setdefault(eid + 1 + offset, [fetype, elenodes[eid]])
+            _els.setdefault(eid + 1 + offset, {"eid": eid + 1 + offset, "fetype": fetype, "nodes": elenodes[eid]})
+            els.setdefault(eid + 1 + offset, {"eid": eid + 1 + offset, "fetype": fetype, "nodes": elenodes[eid]})
 
         elements += Elements(_els)
 
@@ -680,7 +680,7 @@ class TestMaterialISO:
     @pytest.mark.parametrize("material", materials[:-2])
     def test_init_array(self, material):
         name = material["name"]
-        mtype = material["type"]
+        fetype = material["fetype"]
         E = material["E"]
         n = material["nu"]
         r = material["rho"]
@@ -715,7 +715,7 @@ class TestMaterialISO:
                     _G = E / (2. * (1. + n))
 
             # m = MaterialISO(name, E, n, r, a, G)
-            m = Material.New(name, mtype, E, n, r, a, G)
+            m = Material.New(name, fetype, E, n, r, a, G)
 
             assert m.name == name
             if type(E) is np.ndarray:
@@ -749,7 +749,7 @@ class TestMaterialISO:
 
             mdict = m.asdict()
             assert mdict["name"] == name
-            assert mdict["type"] == mtype
+            assert mdict["fetype"] == fetype
             assert mdict["E"] == E
             assert mdict["nu"] == n
             assert mdict["rho"] == r
@@ -758,7 +758,7 @@ class TestMaterialISO:
 
             mlist = m.aslist()
             assert mlist[0] == name
-            assert mlist[1] == mtype
+            assert mlist[1] == fetype
             assert mlist[2] == E
             assert mlist[3] == n
             assert mlist[4] == r
@@ -769,12 +769,12 @@ class TestMaterialISO:
         else:
             with pytest.raises(result):
                 # m = MaterialISO(name, E, n, r, a, G)
-                m = Material.New(name, mtype, E, n, r, a, G)
+                m = Material.New(name, fetype, E, n, r, a, G)
 
     @pytest.mark.parametrize("material", materials)
     def test_init_list(self, material):
         name = material["name"]
-        mtype = material["type"]
+        fetype = material["fetype"]
         E = material["E"]
         n = material["nu"]
         r = material["rho"]
@@ -805,10 +805,10 @@ class TestMaterialISO:
                     _G = E / (2. * (1. + n))
 
             # m = MaterialISO(name, E, n, r, a, G)
-            m = Material.New(name, mtype, E, n, r, a, G)
+            m = Material.New(name, fetype, E, n, r, a, G)
 
             assert m.name == name
-            assert m.type == mtype
+            assert m.fetype == fetype
             if type(E) is list:
                 assert m.young.tolist() == E
             else:
@@ -832,7 +832,7 @@ class TestMaterialISO:
 
             mdict = m.asdict()
             assert mdict["name"] == name
-            assert mdict["type"] == mtype
+            assert mdict["fetype"] == fetype
             assert mdict["E"] == E
             assert mdict["nu"] == n
             assert mdict["rho"] == r
@@ -841,7 +841,7 @@ class TestMaterialISO:
 
             mlist = m.aslist()
             assert mlist[0] == name
-            assert mlist[1] == mtype
+            assert mlist[1] == fetype
             assert mlist[2] == E
             assert mlist[3] == n
             assert mlist[4] == r
@@ -851,12 +851,12 @@ class TestMaterialISO:
         else:
             with pytest.raises(result):
                 # m = MaterialISO(name, E, n, r, a, G)
-                m = Material.New(name, mtype, E, n, r, a, G)
+                m = Material.New(name, fetype, E, n, r, a, G)
 
     @pytest.mark.parametrize("material", materials)
     def test_init_dict(self, material):
         name = material["name"]
-        mtype = material["type"]
+        fetype = material["fetype"]
         E = material["E"]
         n = material["nu"]
         r = material["rho"]
@@ -895,7 +895,7 @@ class TestMaterialISO:
                     _G = E / (2. * (1. + n))
 
             # m = MaterialISO(name, E, n, r, a, G)
-            m = Material.New(name, mtype, E, n, r, a, G)
+            m = Material.New(name, fetype, E, n, r, a, G)
 
             assert m.name == name
             if type(E) is dict:
@@ -927,7 +927,7 @@ class TestMaterialISO:
 
             mdict = m.asdict()
             assert mdict["name"] == name
-            assert mdict["type"] == mtype
+            assert mdict["fetype"] == fetype
             assert mdict["E"] == E
             assert mdict["nu"] == n
             assert mdict["rho"] == r
@@ -936,7 +936,7 @@ class TestMaterialISO:
 
             mlist = m.aslist()
             assert mlist[0] == name
-            assert mlist[1] == mtype
+            assert mlist[1] == fetype
             assert mlist[2] == E
             assert mlist[3] == n
             assert mlist[4] == r
@@ -946,18 +946,18 @@ class TestMaterialISO:
         else:
             with pytest.raises(result):
                 # m = MaterialISO(name, E, n, r, a, G)
-                m = Material.New(name, mtype, E, n, r, a, G)
+                m = Material.New(name, fetype, E, n, r, a, G)
 
 class TestMaterial:
     @pytest.mark.parametrize("material", materials)
     def test_New_dict(self, material):
         if material["result"] == "pass":
-            m = Material.New(material["name"], material["type"], material)
+            m = Material.New(material["name"], material["fetype"], material)
             assert m.name == material["name"]
-            assert m.type == material["type"]
+            assert m.fetype == material["fetype"]
         else:
             with pytest.raises(material["result"]):
-                m = Material.New(material["name"], material["type"], material)
+                m = Material.New(material["name"], material["fetype"], material)
 
     @pytest.mark.parametrize("material", materials)
     def test_New_list(self, material):
@@ -965,12 +965,12 @@ class TestMaterial:
             mat = []
             for key in ("E", "nu", "rho", "alpha", "G"):
                 mat.append(material[key])
-            m = Material.New(material["name"], material["type"], mat)
+            m = Material.New(material["name"], material["fetype"], mat)
             assert m.name == material["name"]
-            assert m.type == material["type"]
+            assert m.fetype == material["fetype"]
         else:
             with pytest.raises(material["result"]):
-                m = Material.New(material["name"], material["type"], material)
+                m = Material.New(material["name"], material["fetype"], material)
 
     @pytest.mark.parametrize("material", materials)
     def test_New_expand_list(self, material):
@@ -978,22 +978,22 @@ class TestMaterial:
             mat = []
             for key in ("E", "nu", "rho", "alpha", "G"):
                 mat.append(material[key])
-            m = Material.New(material["name"], material["type"], *mat)
+            m = Material.New(material["name"], material["fetype"], *mat)
             assert m.name == material["name"]
-            assert m.type == material["type"]
+            assert m.fetype == material["fetype"]
         else:
             with pytest.raises(material["result"]):
-                m = Material.New(material["name"], material["type"], material)
+                m = Material.New(material["name"], material["fetype"], material)
 
 
 class TestMaterials:
     def test_init_dict(self):
-        mats = [[m["name"], m["type"], m] for m in materials if m["result"] == "pass"]
+        mats = [[m["name"], m["fetype"], m] for m in materials if m["result"] == "pass"]
         m = Materials(mats)
         assert m.count == len(mats)
 
     def test_init_list(self):
-        mats = [[m["name"], m["type"], m] for m in materials if m["result"] == "pass"]
+        mats = [[m["name"], m["fetype"], m] for m in materials if m["result"] == "pass"]
         for i in range(len(mats)):
             _mats = []
             for key in ("E", "nu", "rho", "alpha", "G"):
@@ -1003,7 +1003,7 @@ class TestMaterials:
         assert m.count == len(mats)
 
     def test_dupl(self):
-        mats = [["stahl", m["type"], m] for m in materials if m["result"] == "pass"]
+        mats = [["stahl", m["fetype"], m] for m in materials if m["result"] == "pass"]
         with pytest.raises(ValueError):
             m = Materials(mats)
 

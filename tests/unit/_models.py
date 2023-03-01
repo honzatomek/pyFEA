@@ -164,7 +164,7 @@ models = [mass,
 
 
 stahl = {"name": "stahl",
-         "type": "ISO",
+         "fetype": "ISO",
          "E": 210000.,
          "nu": 0.3,
          "rho": 7.85e-9,
@@ -173,7 +173,7 @@ stahl = {"name": "stahl",
          "result": "pass"}
 
 stahl_shear = {"name": "stahl_shear",
-               "type": "ISO",
+               "fetype": "ISO",
                "E": 210000.,
                "nu": 0.3,
                "rho": 7.85e-9,
@@ -182,7 +182,7 @@ stahl_shear = {"name": "stahl_shear",
                "result": "pass"}
 
 stahl_temp = {"name": "stahl_temp",
-              "type": "ISO",
+              "fetype": "ISO",
               "E": [[  0., 210000.],
                     [ 20., 210000.],
                     [100., 208000.],
@@ -222,7 +222,7 @@ stahl_temp = {"name": "stahl_temp",
               "result": "pass"}
 
 stahl_shear_temp = {"name": "stahl_shear_temp",
-                    "type": "ISO",
+                    "fetype": "ISO",
                     "E": [[  0., 210000.],
                           [ 20., 210000.],
                           [100., 208000.],
@@ -271,7 +271,7 @@ stahl_shear_temp = {"name": "stahl_shear_temp",
                     "result": "pass"}
 
 stahl_fail01 = {"name": "1stahl_fail01",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": 210000.,
                 "nu": 0.3,
                 "rho": 7.85e-9,
@@ -280,7 +280,7 @@ stahl_fail01 = {"name": "1stahl_fail01",
                 "result": ValueError}
 
 stahl_fail02 = {"name": "_stahl_fail02",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": 210000.,
                 "nu": 0.3,
                 "rho": 7.85e-9,
@@ -289,7 +289,7 @@ stahl_fail02 = {"name": "_stahl_fail02",
                 "result": ValueError}
 
 stahl_fail03 = {"name": 1001,
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": 210000.,
                 "nu": 0.3,
                 "rho": 7.85e-9,
@@ -298,7 +298,7 @@ stahl_fail03 = {"name": 1001,
                 "result": TypeError}
 
 stahl_fail04 = {"name": "stahl_fail04",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": 0.,
                 "nu": 0.3,
                 "rho": 7.85e-9,
@@ -307,7 +307,7 @@ stahl_fail04 = {"name": "stahl_fail04",
                 "result": ValueError}
 
 stahl_fail05 = {"name": "stahl_fail05",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": -1.,
                 "nu": 0.3,
                 "rho": 7.85e-9,
@@ -316,7 +316,7 @@ stahl_fail05 = {"name": "stahl_fail05",
                 "result": ValueError}
 
 stahl_fail06 = {"name": "stahl_fail06",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": "a",
                 "nu": 0.3,
                 "rho": 7.85e-9,
@@ -325,7 +325,7 @@ stahl_fail06 = {"name": "stahl_fail06",
                 "result": TypeError}
 
 stahl_fail07 = {"name": "stahl_fail07",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": 210000.,
                 "nu": 0.,
                 "rho": 7.85e-9,
@@ -334,7 +334,7 @@ stahl_fail07 = {"name": "stahl_fail07",
                 "result": ValueError}
 
 stahl_fail08 = {"name": "stahl_fail08",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": 210000.,
                 "nu": -0.3,
                 "rho": 7.85e-9,
@@ -343,7 +343,7 @@ stahl_fail08 = {"name": "stahl_fail08",
                 "result": ValueError}
 
 stahl_fail09 = {"name": "stahl_fail09",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": 210000.,
                 "nu": "a",
                 "rho": 7.85e-9,
@@ -352,7 +352,7 @@ stahl_fail09 = {"name": "stahl_fail09",
                 "result": TypeError}
 
 stahl_fail10 = {"name": "stahl_fail10",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": 210000.,
                 "nu": 0.3,
                 "rho": 0.,
@@ -361,7 +361,7 @@ stahl_fail10 = {"name": "stahl_fail10",
                 "result": ValueError}
 
 stahl_fail11 = {"name": "stahl_fail11",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": 210000.,
                 "nu": 0.3,
                 "rho": -7.85e-9,
@@ -370,7 +370,7 @@ stahl_fail11 = {"name": "stahl_fail11",
                 "result": ValueError}
 
 stahl_fail12 = {"name": "stahl_fail12",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": 210000.,
                 "nu": 0.3,
                 "rho": "a",
@@ -379,7 +379,7 @@ stahl_fail12 = {"name": "stahl_fail12",
                 "result": TypeError}
 
 stahl_fail13 = {"name": "stahl_fail13",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": 210000.,
                 "nu": 0.3,
                 "rho": 7.85e-9,
@@ -388,7 +388,7 @@ stahl_fail13 = {"name": "stahl_fail13",
                 "result": ValueError}
 
 stahl_fail14 = {"name": "stahl_fail14",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": 210000.,
                 "nu": 0.3,
                 "rho": -7.85e-9,
@@ -397,7 +397,7 @@ stahl_fail14 = {"name": "stahl_fail14",
                 "result": ValueError}
 
 stahl_fail15 = {"name": "stahl_fail15",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": 210000.,
                 "nu": 0.3,
                 "rho": 7.85e-9,
@@ -406,7 +406,7 @@ stahl_fail15 = {"name": "stahl_fail15",
                 "result": TypeError}
 
 stahl_fail16 = {"name": "stahl_fail16",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": [[  0., 210000.],
                       [ 20., 210000.],
                       [100., 208000.],
@@ -425,7 +425,7 @@ stahl_fail16 = {"name": "stahl_fail16",
                 "result": ValueError}
 
 stahl_fail17 = {"name": "stahl_fail17",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": [[  0., 210000.],
                       [ 20., 210000.],
                       [100., 208000.],
@@ -444,7 +444,7 @@ stahl_fail17 = {"name": "stahl_fail17",
                 "result": ValueError}
 
 stahl_fail18 = {"name": "stahl_fail18",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": [[  0, 210000.],
                       [ 20, 210000.],
                       [100, 208000.],
@@ -463,7 +463,7 @@ stahl_fail18 = {"name": "stahl_fail18",
                 "result": TypeError}
 
 stahl_fail19 = {"name": "stahl_fail19",
-                "type": "ISO",
+                "fetype": "ISO",
                 "E": [[  0., 210000],
                       [ 20., 210000],
                       [100., 208000],
@@ -509,7 +509,7 @@ materials = [stahl, stahl_shear,
 
 
 mass3_1 = {"name":  "mass3_1",
-           "ptype":    "MASS",
+           "fetype":    "MASS",
            "mxx":         0.1,
            "myy":         0.1,
            "mzz":         0.1}
@@ -519,7 +519,7 @@ mass3_2 = ["mass3_2", "MASS", 0.1, 0.1, 0.1]
 mass3_3 = ("mass3_3", "MASS", 0.1, 0.1, 0.1)
 
 mass6_1 = {"name":  "mass6_1",
-           "ptype":    "MASS",
+           "fetype":    "MASS",
            "mxx":         0.1,
            "myy":         0.1,
            "mzz":         0.1,
@@ -535,7 +535,7 @@ mass6_2 = ["mass6_3", "MASS", 0.1, 0.1, 0.1, 0.001, 0.001, 0.001, 0.001, 0.001, 
 mass6_3 = ("mass6_4", "MASS", 0.1, 0.1, 0.1, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001)
 
 rod_1 = {"name":  "rod_1",
-         "ptype":    "ROD",
+         "fetype":    "ROD",
          "A":      1000.0,
          "nsm":     0.001}
 
@@ -544,7 +544,7 @@ rod_2 = ["rod_2", "ROD", 5380.0, 0.001]
 rod_3 = ("rod_3", "ROD", 5380.0, 0.001)
 
 beam_1 = {"name":  "beam_1",
-          "ptype":   "BEAM",
+          "fetype":   "BEAM",
           "A":       5380.0,
           "Iyy": 83600000.0,
           "Izz":  6040000.0,
@@ -556,7 +556,7 @@ beam_2 = ["beam_2", "BEAM", 5380.0, 83600000.0, 6040000.0, 126000000.0, 0.001]
 beam_3 = ("beam_3", "BEAM", 5380.0, 83600000.0, 6040000.0, 126000000.0, 0.001)
 
 shell_1 = {"name":  "shell_1",
-           "ptype":   "SHELL",
+           "fetype":   "SHELL",
            "t":           10.,
            "nsm":     0.00015}
 
@@ -565,7 +565,7 @@ shell_2 = ["shell_2", "SHELL", 10., 0.00015]
 shell_3 = ("shell_3", "SHELL", 10., 0.00015)
 
 tria3_1 = {"name":  "tria3_1",
-           "ptype":   "TRIA3",
+           "fetype":   "TRIA3",
            "t1":          10.,
            "t2":          15.,
            "t3":          20.,
@@ -575,7 +575,7 @@ tria3_2 = ["tria3_2", "TRIA3", 10., 15., 20., 0.00015]
 tria3_3 = ("tria3_3", "TRIA3", 10., 15., 20., 0.00015)
 
 tria6_1 = {"name":  "tria6_1",
-           "ptype":   "TRIA6",
+           "fetype":   "TRIA6",
            "t1":          10.,
            "t2":          15.,
            "t3":          20.,
@@ -589,7 +589,7 @@ tria6_2 = ["tria6_2", "TRIA6", 10., 15., 20., 25., 30., 35., 0.00015]
 tria6_3 = ("tria6_3", "TRIA6", 10., 15., 20., 25., 30., 35., 0.00015)
 
 quad4_1 = {"name":  "quad4_1",
-           "ptype":   "QUAD4",
+           "fetype":   "QUAD4",
            "t1":          10.,
            "t2":          15.,
            "t3":          20.,
@@ -601,7 +601,7 @@ quad4_2 = ["quad4_2", "QUAD4", 10., 15., 20., 25., 0.00015]
 quad4_3 = ("quad4_3", "QUAD4", 10., 15., 20., 25., 0.00015)
 
 quad8_1 = {"name":  "quad8_1",
-           "ptype":   "QUAD8",
+           "fetype":   "QUAD8",
            "t1":          10.,
            "t2":          15.,
            "t3":          20.,
@@ -617,7 +617,7 @@ quad8_2 = ["quad8_2", "QUAD8", 10., 15., 20., 25., 30., 35., 40., 45., 0.00015]
 quad8_3 = ("quad8_3", "QUAD8", 10., 15., 20., 25., 30., 35., 40., 45., 0.00015)
 
 solid_1 = {"name":  "solid_1",
-           "ptype":   "SOLID",
+           "fetype":   "SOLID",
            "nsm":   0.0000015}
 
 solid_2 = ["solid_2", "SOLID", 0.00015]
@@ -636,7 +636,7 @@ properties = [mass3_1, mass3_2, mass3_3,
               solid_1, solid_2, solid_3]
 
 
-load1 = {"type": "conload",
+load1 = {"fetype": "conload",
          "nid": 1001,
          "lpat": 101,
          "Fx":  100.,
@@ -652,7 +652,7 @@ load3 = ("conload", 1002, 101, 100., 100., 100., 100., 100., 100.)
 
 nodal_loads = [load1, load2, load3]
 
-load_fail1 = {"type": "conload",
+load_fail1 = {"fetype": "conload",
               "nid": -1,
               "lpat": 101,
               "Fx":  100.,
@@ -663,7 +663,7 @@ load_fail1 = {"type": "conload",
               "Mz":  100.,
               "result": ValueError}
 
-load_fail2 = {"type": "conload",
+load_fail2 = {"fetype": "conload",
               "nid": "a",
               "lpat": 101,
               "Fx":  100.,
@@ -674,7 +674,7 @@ load_fail2 = {"type": "conload",
               "Mz":  100.,
               "result": TypeError}
 
-load_fail3 = {"type": "conload",
+load_fail3 = {"fetype": "conload",
               "nid": 1001,
               "lpat":   0,
               "Fx":  100.,
@@ -685,7 +685,7 @@ load_fail3 = {"type": "conload",
               "Mz":  100.,
               "result": ValueError}
 
-load_fail4 = {"type": "conload",
+load_fail4 = {"fetype": "conload",
               "nid": 1001,
               "lpat": "a",
               "Fx":  100.,
@@ -696,7 +696,7 @@ load_fail4 = {"type": "conload",
               "Mz":  100.,
               "result": TypeError}
 
-load_fail5 = {"type": "conload",
+load_fail5 = {"fetype": "conload",
               "nid": 1001,
               "lpat": 101,
               "Fx":  None,
@@ -707,7 +707,7 @@ load_fail5 = {"type": "conload",
               "Mz":  None,
               "result": ValueError}
 
-load_fail6 = {"type": "conload",
+load_fail6 = {"fetype": "conload",
               "nid": 1001,
               "lpat": 101,
               "Fx":    0.,
@@ -718,7 +718,7 @@ load_fail6 = {"type": "conload",
               "Mz":    0.,
               "result": ValueError}
 
-load_fail7 = {"type": "conload",
+load_fail7 = {"fetype": "conload",
               "nid": 1001,
               "lpat": 101,
               "Fx":    0.,
@@ -755,7 +755,7 @@ nodal_loads_list = [
 nodal_loads_dict = {
     100: {
         1001: {
-            "type": "conload",
+            "fetype": "conload",
             "nid":   1001,
             "lpat":   100,
             "Fx":   1000.,
@@ -765,7 +765,7 @@ nodal_loads_dict = {
             "My":      0.,
             "Mz":      0.},
         1002: {
-            "type": "conload",
+            "fetype": "conload",
             "nid":   1002,
             "lpat":   100,
             "Fx":      0.,
@@ -775,7 +775,7 @@ nodal_loads_dict = {
             "My":      0.,
             "Mz":      0.},
         1003: {
-            "type": "conload",
+            "fetype": "conload",
             "nid":   1003,
             "lpat":   100,
             "Fx":      0.,
@@ -785,7 +785,7 @@ nodal_loads_dict = {
             "My":      0.,
             "Mz":      0.},
         1004: {
-            "type": "conload",
+            "fetype": "conload",
             "nid":   1004,
             "lpat":   100,
             "Fx":      0.,
@@ -795,7 +795,7 @@ nodal_loads_dict = {
             "My":      0.,
             "Mz":      0.},
         1005: {
-            "type": "conload",
+            "fetype": "conload",
             "nid":   1005,
             "lpat":   100,
             "Fx":      0.,
@@ -807,7 +807,7 @@ nodal_loads_dict = {
         },
     200: {
         1001: {
-            "type": "conload",
+            "fetype": "conload",
             "nid":   1001,
             "lpat":   200,
             "Fx":   -100.,
@@ -817,7 +817,7 @@ nodal_loads_dict = {
             "My":      0.,
             "Mz":      0.},
         1002: {
-            "type": "conload",
+            "fetype": "conload",
             "nid":   1002,
             "lpat":   200,
             "Fx":      0.,
@@ -827,7 +827,7 @@ nodal_loads_dict = {
             "My":      0.,
             "Mz":      0.},
         1003: {
-            "type": "conload",
+            "fetype": "conload",
             "nid":   1003,
             "lpat":   200,
             "Fx":      0.,
@@ -837,7 +837,7 @@ nodal_loads_dict = {
             "My":      0.,
             "Mz":      0.},
         1004: {
-            "type": "conload",
+            "fetype": "conload",
             "nid":   1004,
             "lpat":   200,
             "Fx":      0.,
@@ -847,7 +847,7 @@ nodal_loads_dict = {
             "My":      0.,
             "Mz":      0.},
         1005: {
-            "type": "conload",
+            "fetype": "conload",
             "nid":   1005,
             "lpat":   200,
             "Fx":      0.,
@@ -859,7 +859,7 @@ nodal_loads_dict = {
         },
     300: {
         1001: {
-            "type": "conload",
+            "fetype": "conload",
             "nid":   1001,
             "lpat":   300,
             "Fx":      0.,
@@ -869,7 +869,7 @@ nodal_loads_dict = {
             "My":      0.,
             "Mz":      0.},
         1002: {
-            "type": "conload",
+            "fetype": "conload",
             "nid":   1002,
             "lpat":   300,
             "Fx":      0.,
@@ -879,7 +879,7 @@ nodal_loads_dict = {
             "My":    100.,
             "Mz":   1000.},
         1003: {
-            "type": "conload",
+            "fetype": "conload",
             "nid":   1003,
             "lpat":   300,
             "Fx":      0.,
@@ -889,7 +889,7 @@ nodal_loads_dict = {
             "My":    100.,
             "Mz":   1000.},
         1004: {
-            "type": "conload",
+            "fetype": "conload",
             "nid":   1004,
             "lpat":   300,
             "Fx":      0.,
@@ -899,7 +899,7 @@ nodal_loads_dict = {
             "My":    100.,
             "Mz":   1000.},
         1005: {
-            "type": "conload",
+            "fetype": "conload",
             "nid":   1005,
             "lpat":   300,
             "Fx":      0.,
