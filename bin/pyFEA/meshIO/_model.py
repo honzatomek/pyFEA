@@ -6,6 +6,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 import scipy.interpolate
 import scipy.spatial
+import scipy.sparse
 import scipy.interpolate.interpnd
 
 from rich.console import Console
@@ -28,6 +29,8 @@ element_type = {
     "WEDGE6":   6,
     # "WEDGE15": 15,
     "PYRA5":    5,
+    "RBE2":    -1,
+    "RBE3":    -1,
 }
 
 element_topology = {
@@ -47,6 +50,8 @@ element_topology = {
     "WEDGE6":   3,
     # "WEDGE15": 3,
     "PYRA5":    3,
+    "RBE2":    -1,
+    "RBE3":    -1,
 }
 
 
@@ -760,7 +765,7 @@ class Elements(ContainerDict):
                 if type(element) is Element:
                     self.elements = element
                 elif type(element) in (tuple, list):
-                    self.elements = Element(element[0], element[1], element[2])
+                    self.elements = Element(element[0], element[1], element[2:])
                 else:
                     message(f"Wrong definition of Element {str(element):s}")
                     Error(message)
@@ -771,7 +776,10 @@ class Elements(ContainerDict):
                 if type(element) is Element:
                     self.elements = element
                 elif type(element) in (tuple, list):
-                    self.elements = Element(eid, element[0], element[1])
+                    self.elements = Element(element[0], element[1], element[2:])
+                    # self.elements = Element(*element)
+                elif type(element) is dict:
+                    self.elements = Element(**element)
                 else:
                     message(f"Wrong definition of Element {eid:n} ({str(element):s}).")
                     Error(message)
@@ -786,15 +794,67 @@ class Elements(ContainerDict):
         elements = []
         for eid, element in self.elements.items():
             # elements.append([eid, element.type, *element.nodes])
-            elements.append([eid, element.type, element.nodes])
+            elements.append([eid, element.type, *element.nodes])
         return elements
 
     def asdict(self) -> dict:
         elements = {}
         for eid, element in self.elements.items():
             # elements.setdefault(eid, [element.type, *element.nodes])
-            elements.setdefault(eid, [element.type, element.nodes])
+            elements.setdefault(eid, {"eid": eid, "etype": element.type, "nodes": element.nodes})
         return elements
+
+    # TODO:
+    def node_connectivity_matrix(self) -> [dict, np.ndarray]:
+        """
+        TODO:
+        Creates a Node connectivity matrix for Node (DOF) renumbering using
+        Reverse Cuthill-McKee algorithm.
+        """
+        # 1. get all node IDs:
+        nodeids = []
+        for element in self.elements.values():
+            nodeids.extend(element.nodes)
+        # 2. sort them by ID
+        nodeids = sorted(list(set(nodeids)))
+        # 3. assign them an order {node ID: index}
+        nodeids = {v: i for v in nodeids}
+
+        # 4. create an empty sparse connectivity matrix
+        C = np.scipy.csr_matrix(np.zeros((len(nodeids), len(nodeids)), dtype=int))
+
+        # 5. input the connectivity into the matrix
+        for element in self.elements.values():
+            for i in element.nodes:
+                for j in element.nodes:
+                    C[nodeids[i], nodeids[j]] = 1
+
+        return nodeids, C
+
+    def reverse_cuthill_mckee(self, permutation: bool = True) -> [np.ndarray, np.ndarray]:
+        """
+        Creates a permutation matrix for node ordering using a Reverse Cuthill-McKee
+        algorithm
+
+        Beware: the node
+
+        """
+        # 1. get the connectivity matrix
+        nodeids, C = self.node_connectivity_matrix()
+
+        # 2. compute the new node order
+        perm = scipy.sparse.csgraph.reverse_cuthill_mckee(C, False)
+
+        # 3. create a dictionary with new node order
+        nodeids = {nid: perm[i] for nid, i in nodeids.items()}
+
+        if permutation:
+            # 4. create the permutation matrix for node order if requested
+            P = C[np._ix(perm, perm)]
+            return nodeids, P
+        else:
+            # 4. or return just the new node order
+            return nodeids
 
 
 class Material(Name):
@@ -1657,7 +1717,7 @@ class Properties(ContainerDict):
 
 
 # TODO:
-class LoadN(Id):
+class CLoad(Id):
     def __init__(self, nid: int, lpat: int,
                  Fx: float = None, Fy: float = None, Fz: float = None,
                  Mx: float = None, My: float = None, Mz: float = None):
@@ -1793,9 +1853,9 @@ class LoadE:
 # ?? LPAT ??
 # group loads based on lpat
 class LoadsN(Id, ContainerDict):
-    def __init__(self, lpat: int, loads: [LoadN | tuple | list | dict]):
+    def __init__(self, lpat: int, loads: [CLoad | tuple | list | dict]):
         Id.__init__(self, lpat)
-        ContainerDict.__init__(self, "ID", int, "Nodal Load", LoadN)
+        ContainerDict.__init__(self, "ID", int, "Nodal Load", CLoad)
         self.loads = loads
 
     @property
@@ -1807,12 +1867,12 @@ class LoadsN(Id, ContainerDict):
         self.id = lpat
 
     @property
-    def loads(self) -> dict[int, LoadN]:
+    def loads(self) -> dict[int, CLoad]:
         return super().asdict()
 
     @loads.setter
-    def loads(self, loads: [LoadN | list[LoadN] | dict[int, ArrayLike] | ArrayLike]):
-        if type(loads) is LoadN:
+    def loads(self, loads: [CLoad | list[CLoad] | dict[int, ArrayLike] | ArrayLike]):
+        if type(loads) is CLoad:
             # print(f"{loads = }")
             if self.lpat != loads.lpat:
                 message = (f"{type(self).__name__:s} cannot have more than one LPAT " +
@@ -1827,40 +1887,40 @@ class LoadsN(Id, ContainerDict):
         # TODO:
         elif type(loads) in (tuple, list):
             for load in loads:
-                if type(load) is LoadN:
+                if type(load) is CLoad:
                     self.loads = load
 
                 elif type(load) in (tuple, list):
-                    self.loads = LoadN(*load)
+                    self.loads = CLoad(*load)
 
                 elif type(load) is dict:
-                    self.loads = LoadN(**load)
+                    self.loads = CLoad(**load)
 
                 else:
                     message = (f"Nodal Load {str(load):s} must be of type " +
-                               f"(tuple, list, dict, LoadN), not {str(type(load).__name__):s}.")
+                               f"(tuple, list, dict, CLoad), not {str(type(load).__name__):s}.")
                     Error(message)
                     raise TypeError(message)
 
         elif type(loads) is dict:
             for nid, load in loads.items():
-                if type(load) is LoadN:
+                if type(load) is CLoad:
                     self.loads = load
 
                 elif type(load) in (list, tuple):
-                    self.loads = LoadN(*list(load))
+                    self.loads = CLoad(*list(load))
 
                 elif type(load) is dict:
-                    self.loads = LoadN(**list(load))
+                    self.loads = CLoad(**list(load))
 
                 else:
                     message = (f"Nodal Load {str(load):s} must be of type " +
-                               f"(tuple, list, dict, LoadN), not {str(type(load).__name__):s}.")
+                               f"(tuple, list, dict, CLoad), not {str(type(load).__name__):s}.")
                     Error(message)
                     raise TypeError(message)
 
         else:
-            message = (f"Nodal Load {str(loads):s} must be one of (tuple, list, dict, LoadN) " +
+            message = (f"Nodal Load {str(loads):s} must be one of (tuple, list, dict, CLoad) " +
                        f"types, not {str(type(nodes).__name__):s}.")
             Error(message)
             raise TypeError(message)
@@ -1885,29 +1945,29 @@ class LoadsE:
 
 # TODO:
 class Loading:
-    def __init__(self, loads: [LoadN | LoadE | tuple | list | dict] = None):
+    def __init__(self, loads: [CLoad | LoadE | tuple | list | dict] = None):
         self._nodal = ContainerDict("LPat", int, "Nodal Load", (LoadsN))
         self._elemental = ContainerDict("LPat", int, "Elemental Load", (LoadsE))
-        self._loads = loads
+        self.assign(loads)
 
     @property
     def nodal(self) -> ContainerDict:
         return self._nodal.asdict()
 
     @nodal.setter
-    def nodal(self, load: [tuple | list | dict | LoadsN | LoadN]):
+    def nodal(self, load: [tuple | list | dict | LoadsN | CLoad]):
         if load is None:
             pass
 
-        # LoadN
-        elif type(load) is LoadN:
+        # CLoad
+        elif type(load) is CLoad:
             nid = load.id
             lpat = load.lpat
             if lpat not in self._nodal.keys():
-                self._nodal[lpat] = LoadsN(lpat, load)
+                self.nodal[lpat] = LoadsN(lpat, load)
 
             else:
-                self._nodal[lpat] = load
+                self.nodal[lpat].loads = load
 
         # LoadsN
         elif type(load) is LoadsN:
@@ -1923,22 +1983,22 @@ class Loading:
         elif type(load) in (tuple, list):
             # [nid, lpat, Fx .. Mz]
             if type(load[0]) is int and len(load) == 8:
-                self.nodal = LoadN(*load)
+                self.nodal[load[1]] = CLoad(*load)
 
             else:
                 for l in load:
-                    # [LoadN_1, ... , LoadN_2]
-                    if type(l) is LoadN:
-                        self.nodal = l
+                    # [CLoad_1, ... , CLoad_2]
+                    if type(l) is CLoad:
+                        self.nodal[l.lpat] = l
 
                     # [[nid, lpat, Fx .. Mz]]
                     elif type(l) in (tuple, list):
                         lpat = l[1]
-                        self.nodal = LoadN(*l)
+                        self.nodal[lpat] = CLoad(*l)
 
                     # [{nid, lpat, Fx .. Mz}]
                     elif type(l) is dict:
-                        self.nodal = LoadN(**l)
+                        self.nodal[l["lpat"]] = CLoad(**l)
 
                     else:
                         message = (f"{type(self).__name__:s} Nodal Loads type must be a list " +
@@ -1957,20 +2017,20 @@ class Loading:
                 elif type(l) is dict:
                     self.nodal = LoadsN(lpat, l)
 
-                # {lpat: LoadN | LoadsN}
-                elif type(l) in (LoadN, LoadsN):
+                # {lpat: CLoad | LoadsN}
+                elif type(l) in (CLoad, LoadsN):
                     self.nodal = l
 
                 else:
                     message = (f"{type(self).__name__:s} Nodal Loads type must be a tuple, " +
-                               f"list, dict, LoadN or LoadsN, not " +
+                               f"list, dict, CLoad or LoadsN, not " +
                                f"{type(load).__name__:s}({type(l).__name__:s}) - {str(l):s}.")
                     Error(message)
                     raise TypeError(message)
 
         else:
             message = (f"{type(self).__name__:s} Nodal Loads type must be one of " +
-                       f"(tuple, list, dict, LoadsN, LoadN), not {type(load).__name__:s}.")
+                       f"(tuple, list, dict, LoadsN, CLoad), not {type(load).__name__:s}.")
             Error(message)
             raise TypeError(message)
 
@@ -1980,27 +2040,22 @@ class Loading:
         return self._elemental.asdict()
 
     @elemental.setter
-    def elemental(self, load: (tuple, list, dict, LoadsN, LoadN)):
+    def elemental(self, load: (tuple, list, dict, LoadsN, CLoad)):
         # TODO:
         self._elemental = load
 
-    @property
-    def _loads(self) -> tuple[LoadsN, LoadsE]:
-        return (self.nodal, self.elemental)
-
-    @_loads.setter
-    def _loads(self, load: [tuple | list | dict | LoadsN | LoadsE | LoadN | LoadE]):
+    def assign(self, load: [tuple | list | dict | LoadsN | LoadsE | CLoad | LoadE]):
         if load is None:
             pass
 
-        elif type(load) is LoadN:
+        elif type(load) is CLoad:
             nid = load.id
             lpat = load.lpat
 
             if lpat not in self.nodal.keys():
                 self.nodal[lpat] = LoadsN(load)
             else:
-                self.nodal[lpat].loads = load
+                self.nodal[lpat].loads += load
 
         elif type(load) is LoadE:
             eid = load.id
