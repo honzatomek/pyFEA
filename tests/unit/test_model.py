@@ -7,25 +7,25 @@ from random import randint
 import pdb
 
 try:
-    from pyFEA.meshIO._model import Node, Nodes, Element, Elements
-    from pyFEA.meshIO._model import Material, MaterialISO, Materials
-    from pyFEA.meshIO._model import Property, Properties
-    from pyFEA.meshIO._model import PMass, PRod, PBeam
-    from pyFEA.meshIO._model import PShell, PTria3, PTria6
-    from pyFEA.meshIO._model import PQuad4, PQuad8, PSolid
-    from pyFEA.meshIO._model import CLoad, LoadsN, LoadE, LoadsE, Loading
+    from pyFEA.meshIO.model import Node, Nodes, Element, Elements
+    from pyFEA.meshIO.model import Material, MaterialISO, Materials
+    from pyFEA.meshIO.model import Property, Properties
+    from pyFEA.meshIO.model import PMass, PRod, PBeam
+    from pyFEA.meshIO.model import PShell, PTria3, PTria6
+    from pyFEA.meshIO.model import PQuad4, PQuad8, PSolid
+    from pyFEA.meshIO.model import CLoad, LoadsN, LoadE, LoadsE, Loading
 
 except ImportError as e:
     SRC = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
     SRC = os.path.join(SRC, 'bin')
     sys.path.append(SRC)
-    from pyFEA.meshIO._model import Node, Nodes, Element, Elements
-    from pyFEA.meshIO._model import Material, MaterialISO, Materials
-    from pyFEA.meshIO._model import Property, Properties
-    from pyFEA.meshIO._model import PMass, PRod, PBeam
-    from pyFEA.meshIO._model import PShell, PTria3, PTria6
-    from pyFEA.meshIO._model import PQuad4, PQuad8, PSolid
-    from pyFEA.meshIO._model import CLoad, LoadsN, LoadE, LoadsE, Loading
+    from pyFEA.meshIO.model import Node, Nodes, Element, Elements
+    from pyFEA.meshIO.model import Material, MaterialISO, Materials
+    from pyFEA.meshIO.model import Property, Properties
+    from pyFEA.meshIO.model import PMass, PRod, PBeam
+    from pyFEA.meshIO.model import PShell, PTria3, PTria6
+    from pyFEA.meshIO.model import PQuad4, PQuad8, PSolid
+    from pyFEA.meshIO.model import CLoad, LoadsN, LoadE, LoadsE, Loading
 
 from _models import models, materials, properties, nodal_loads, nodal_loads_fail
 from _models import nodal_loads_list, nodal_loads_dict
@@ -1041,11 +1041,12 @@ class TestProperties:
 class TestCLoad:
     @pytest.mark.parametrize("loadn", nodal_loads)
     def test_init_(self, loadn):
+        # pdb.set_trace()
         if type(loadn) is dict:
             l = CLoad(**loadn)
             assert l.asdict() == loadn
         else:
-            l = CLoad(*loadn)
+            l = CLoad(*loadn[1:])
             assert l.aslist() == list(loadn)
 
     @pytest.mark.parametrize("loadn", nodal_loads_fail)
@@ -1064,7 +1065,7 @@ class TestLoadsN:
                 loadn.append(CLoad(**l))
                 nodes.append(loadn[-1].node)
             else:
-                loadn.append(CLoad(*l))
+                loadn.append(CLoad(*l[1:]))
                 nodes.append(loadn[-1].node)
         loads = LoadsN(lpat, loadn)
         nodes = list(set(nodes))
@@ -1075,13 +1076,14 @@ class TestLoading:
     def test_init_(self):
         loadn = []
         nodes = []
+        # pdb.set_trace()
         lpat = nodal_loads[0]["lpat"]
         for l in nodal_loads:
             if type(l) is dict:
                 loadn.append(CLoad(**l))
                 nodes.append(loadn[-1].node)
             else:
-                loadn.append(CLoad(*l))
+                loadn.append(CLoad(*l[1:]))
                 nodes.append(loadn[-1].node)
         lpat = Loading(loadn)
         print(f"{lpat.nodal = }")
@@ -1089,15 +1091,16 @@ class TestLoading:
         # assert loads.count == len(nodes)
 
     def test_init_list(self):
-        # pdb.set_trace()
         loading = Loading()
         loading.nodal = nodal_loads_list
         loads_per_lpat = {}
-        for l in nodal_loads_list:
-            if l[1] not in loads_per_lpat.keys():
-                loads_per_lpat.setdefault(l[1], 0)
-            loads_per_lpat[l[1]] += 1
-        assert len(loading.nodal) == 3
+        for nl in nodal_loads_list:
+            if nl[1] not in loads_per_lpat.keys():
+                loads_per_lpat.setdefault(nl[1], 0)
+            loads_per_lpat[nl[1]] += 1
+        assert len(loading.nodal) == len(loads_per_lpat)
+        pdb.set_trace()
         for lpat in loading.nodal.keys():
-            assert loads_per_lpat[lpat] == loading.nodal[lpat].loads.count
+            assert loads_per_lpat[lpat] == loading.nodal[lpat].count
+
 

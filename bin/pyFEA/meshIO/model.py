@@ -60,6 +60,8 @@ import scipy.interpolate.interpnd
 
 from rich.console import Console
 
+from _helpers import DictID, DictName, CustomDict
+
 
 
 
@@ -153,6 +155,15 @@ class Id:
         else:
             self._id = id
 
+    def todict(self) -> dict:
+        return {"id": self.id}
+
+    def tolist(self) -> list:
+        return [self.id]
+
+    def toarray(self) -> np.ndarray:
+        pass
+
 
 class Name:
     def __init__(self, name: str):
@@ -180,6 +191,22 @@ class Name:
             raise ValueError(message)
         else:
             self._name = name
+
+    def todict(self) -> dict:
+        return {"name": self.name}
+
+    def tolist(self) -> list:
+        return [self.name]
+
+    def toarray(self) -> np.ndarray:
+        pass
+
+
+class ContainerDict(dict):
+    def __init__(self, key_name: str, key_type: [tuple[type] | list[type] | type],
+                       val_name: str, val_type: [tuple[type] | list[type] | type],
+                       *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 
 class ContainerDict:
@@ -293,10 +320,128 @@ class ContainerDict:
 
 
 
+class Cartesian(Id):
+    def __init__(self, id: int, origin: list | np.ndarray, axis1: list | np.ndarray,
+                 axis2: list | np.ndarray, definition: str = "xy")
+        super().__init__(id)
+
+        if definition == "xy":
+            o = np.array(origin, dtype=float)
+            x = np.array(axis1, dtype=float) - o
+            x /= np.linalg.norm(x)
+            y = np.array(axis2, dtype=float) - o
+            y /= np.linalg.norm(y)
+            z = np.cross(x, y)
+            z /= np.linalg.norm(z)
+            y = np.cross(z, x)
+            y /= np.linalg.norm(y)
+        elif definition == "yx":
+            o = np.array(origin, dtype=float)
+            y = np.array(axis1, dtype=float) - o
+            y /= np.linalg.norm(y)
+            x = np.array(axis2, dtype=float) - o
+            x /= np.linalg.norm(x)
+            z = np.cross(x, y)
+            z /= np.linalg.norm(z)
+            x = np.cross(y, z)
+            x /= np.linalg.norm(x)
+        elif definition == "xz":
+            o = np.array(origin, dtype=float)
+            x = np.array(axis1, dtype=float) - o
+            x /= np.linalg.norm(x)
+            z = np.array(axis2, dtype=float) - o
+            z /= np.linalg.norm(z)
+            y = np.cross(z, x)
+            y /= np.linalg.norm(y)
+            z = np.cross(x, y)
+            z /= np.linalg.norm(z)
+        elif definition == "zx":
+            o = np.array(origin, dtype=float)
+            z = np.array(axis1, dtype=float) - o
+            z /= np.linalg.norm(z)
+            x = np.array(axis2, dtype=float) - o
+            x /= np.linalg.norm(x)
+            y = np.cross(z, x)
+            y /= np.linalg.norm(y)
+            x = np.cross(y, z)
+            x /= np.linalg.norm(x)
+        elif definition == "yz":
+            o = np.array(origin, dtype=float)
+            y = np.array(axis1, dtype=float) - o
+            y /= np.linalg.norm(y)
+            z = np.array(axis2, dtype=float) - o
+            z /= np.linalg.norm(z)
+            x = np.cross(y, z)
+            x /= np.linalg.norm(x)
+            z = np.cross(x, y)
+            z /= np.linalg.norm(z)
+        elif definition == "zy":
+            o = np.array(origin, dtype=float)
+            z = np.array(axis1, dtype=float) - o
+            z /= np.linalg.norm(z)
+            y = np.array(axis2, dtype=float) - o
+            y /= np.linalg.norm(y)
+            x = np.cross(y, z)
+            x /= np.linalg.norm(x)
+            y = np.cross(z, x)
+            y /= np.linalg.norm(y)
+        else:
+            msg = (f"{type(self).__name__:s} definition can be only one of " +
+                   f"({', '.join(['xy', 'yx', 'xz', 'zx', 'yz', 'zy']):s}), " +
+                   f"not {str(definition):s}.")
+            Error(msg)
+            raise ValueError(msg)
+
+        self._o = o
+        self._x = x
+        self._y = y
+        self._z = z
+
+    @property
+    def T(self) -> np.ndarray:
+        return np.hstack((self._x, self._y, self._z))
+
+    @property
+    def o(self) -> np.ndarray:
+        return self._o
+
+    @property
+    def x(self) -> np.ndarray:
+        return self._x
+
+    @property
+    def y(self) -> np.ndarray:
+        return self._y
+
+    @property
+    def z(self) -> np.ndarray:
+        return self._z
+
+    def transform_to(self, coordinates) -> np.ndarray:
+        """
+        transforms coordinates to this csys
+        """
+        return self.T @ (coordinates - self.o)
+
+    def transform_from(self, coordinates) -> np.ndarray:
+        """
+        transforms coordinates from this csys
+        """
+        return (self.T.T @ coordinates) + self.o
+
+
+
 class Node(Id):
-    def __init__(self, nid: int, coors: ArrayLike):
-        super().__init__(nid)
-        self.coors = coors
+    def __init__(self, id: int, coors: ArrayLike = None,
+                 x: float = None, y: float = None, z: float = None):
+        super().__init__(id)
+        if coors is not None:
+            self.coors = coors
+        elif x is not None or y is not None or z is not None:
+            x = 0. if x is None else x
+            y = 0. if y is None else y
+            z = 0. if z is None else z
+            self.coors = [x, y, z]
 
     def __str__(self) -> str:
         return f"Node ID {self.id:n}"
@@ -373,10 +518,10 @@ class Node(Id):
             coors = np.hstack((coors, [0.] * (3 - len(coors))))
         self._coors = np.array(coors, dtype=float).flatten()
 
-    def transform(self, T: np.ndarray):
+    def transform(self, T: np.ndarray = None, O: np.ndarray = None):
         """
         Multiply coordinates by a matrix of transformation sines and cosines:
-        x' = T @ x
+        x' = T @ (x - O)
 
         rotation matrix:
         T  = [x_x x_y x_z]
@@ -400,25 +545,55 @@ class Node(Id):
              [ 0   0   0   1 ]   [1]   [                 1                   ]
 
         """
-        if type(T) is not np.ndarray:
+        if O is None:
+            O = np.zeros(3, dtype=float)
+        elif type(O) is not np.ndarray:
+            message = (f"Offset vector {str(O):s} must be of type numpy.ndarray, " +
+                       f"node {str(type(O).__name__):s}.")
+            Error(message)
+            raise TypeError(message)
+        elif O.shape != (3):
+            message = (f"Offset vector {str(O):s} must be of shape (3,), " +
+                       f"not {str(O.shape):s}.")
+            Error(message)
+            raise ValueError(message)
+
+
+        if T is None:
+            T = np.eye(3, dtype=float)
+        elif type(T) is not np.ndarray:
             message = (f"Transformation matrix {str(T):s} must be of type numpy.ndarray, " +
                        f"node {str(type(T).__name__):s}.")
             Error(message)
             raise TypeError(message)
         elif T.shape == (3, 3):
-            self._coors = T @ self._coors
+            self._coors = T @ (self._coors - O)
         elif T.shape == (3, 4):
-            self._coors = T @ np.hstack((self._coors, [1.]))
+            self._coors = T @ np.hstack((self._coors - O, [1.]))
         elif T.shape == (4, 4):
-            self._coors = (T @ np.hstack((self._coors, [1.])))[:3]
+            self._coors = (T @ np.hstack((self._coors - O, [1.])))[:3]
         else:
             message = (f"Transformation matrix {str(T):s} must be of shape (3, 3) or (3, 4) " +
                        f"or (4, 4), not {str(T.shape):s}.")
             Error(message)
             raise ValueError(message)
 
+    def distance(self, node) -> float:
+        return np.sum((self.coors - node.coors) ** 2.) ** 0.5
 
-class Nodes(ContainerDict):
+    def todict(self) -> dict:
+        x, y, z = self.coors
+        return {"id": self.id, "x": x, "y": y, "z": z}
+
+    def tolist(self) -> list:
+        x, y, z = self.coors
+        return [self.id, x, y, z]
+
+    def toarray(self) -> np.ndarray:
+        return self.coors
+
+
+class Nodes(DictID):
     @classmethod
     def __cuboid(cls, min: np.ndarray, max: np.ndarray, scale: float = 1.) -> np.ndarray:
         """
@@ -433,64 +608,100 @@ class Nodes(ContainerDict):
         min = min.flatten()
         avg = (max + min) / 2
         cube = np.zeros((8, 3), dtype=float)
-        cube[0] = scale * (np.array([max[0], max[1], max[2]], dtype=float) - avg) + avg
-        cube[1] = scale * (np.array([min[0], max[1], max[2]], dtype=float) - avg) + avg
-        cube[2] = scale * (np.array([min[0], min[1], max[2]], dtype=float) - avg) + avg
-        cube[3] = scale * (np.array([max[0], min[1], max[2]], dtype=float) - avg) + avg
-        cube[4] = scale * (np.array([max[0], min[1], min[2]], dtype=float) - avg) + avg
-        cube[5] = scale * (np.array([min[0], min[1], min[2]], dtype=float) - avg) + avg
-        cube[6] = scale * (np.array([max[0], max[1], min[2]], dtype=float) - avg) + avg
-        cube[7] = scale * (np.array([min[0], max[1], min[2]], dtype=float) - avg) + avg
+        cube[0] = (np.array([max[0], max[1], max[2]], dtype=float) - avg) * scale + avg
+        cube[1] = (np.array([min[0], max[1], max[2]], dtype=float) - avg) * scale + avg
+        cube[2] = (np.array([min[0], min[1], max[2]], dtype=float) - avg) * scale + avg
+        cube[3] = (np.array([max[0], min[1], max[2]], dtype=float) - avg) * scale + avg
+        cube[4] = (np.array([max[0], min[1], min[2]], dtype=float) - avg) * scale + avg
+        cube[5] = (np.array([min[0], min[1], min[2]], dtype=float) - avg) * scale + avg
+        cube[6] = (np.array([max[0], max[1], min[2]], dtype=float) - avg) * scale + avg
+        cube[7] = (np.array([min[0], max[1], min[2]], dtype=float) - avg) * scale + avg
 
         return avg, cube
 
-    def __init__(self, nodes: [list[Node] | dict[int, ArrayLike] | ArrayLike]):
-        super().__init__("ID", int, "Node", Node)
-        self.nodes = nodes
+    def __add(self, node):
+        if type(node) is Node:
+            self.setdefault(node.id, node)
 
-    @property
-    def nodes(self) -> dict[int, Node]:
-        return super().asdict()
+        elif type(node) is type(self):
+            for nid, nd in node:
+                self.setdefault(nid, nd)
 
-    @nodes.setter
-    def nodes(self, nodes: [Node | list[Node] | dict[int, ArrayLike] | ArrayLike]):
-        if type(nodes) is Node:
-            self[nodes.id] = nodes
+        elif type(node) is list:
+            for nd in node:
+                if type(nd) is Node:
+                    self.setdefault(nd.id, node)
 
-        elif type(nodes) in (tuple, list):
-            if type(nodes[0]) is float:
-                self.nodes = Node(self.max + 1 if self.max else 1, nodes)
+                elif type(nd) in (list, np.ndarray):
+                    if len(nd) < 4:
+                        id = 1 if not self.max else self.max + 1
+                        self.setdefault(id, Node(id, nd))
+                    else:
+                        self.setdefault(nd[0], Node(nd[0], nd[1:]))
+
+                else:
+                    msg = (f"{type(self).__name__:s} Node must be of type Node, list, dict," +
+                           f"Nodes or np.ndarray, not \"{type(nd).__name__:s}\".")
+                    Error(msg)
+                    raise TypeError(msg)
+
+        elif type(node) is dict:
+            if "id" in node.keys():
+                self.setdefault(node["id"], Node(**node))
 
             else:
-                for node in nodes:
-                    if type(node) is Node:
-                        self.nodes = node
+                for nid, nd in node.items():
+                    if type(nd) is Node:
+                        self.setdefault(nid, nd)
 
-                    elif type(node) in (tuple, list, np.ndarray):
-                        self.nodes = Node(self.max + 1 if self.max else 1, node)
+                    elif type(nd) in (list, np.ndarray):
+                        self.setdefault(nid, Node(nid, nd))
+
+                    elif type(nd) is dict:
+                        self.setdefault(nid, Node(**nd))
+
                     else:
-                        message = (f"Node {str(node):s} must be of type Node, not " +
-                                   f"{str(type(node).__name__):s}.")
-                        Error(message)
-                        raise TypeError(message)
+                        msg = (f"{type(self).__name__:s} Node must be of type Node, list, dict," +
+                               f"Nodes or np.ndarray, not \"{type(nd).__name__:s}\".")
+                        Error(msg)
+                        raise TypeError(msg)
 
-        elif type(nodes) is dict:
-            for nid, node in nodes.items():
-                if type(node) is Node:
-                    self.nodes = node
+        elif type(node) is np.ndarray:
+            if len(node.shape) == 1:
+                id = 1 if not self.max else self.max + 1
+                self.setdefault(id, Node(id, node))
 
-                elif type(node) in (list, tuple, np.ndarray):
-                    self.nodes = Node(nid, node)
-
-        elif type(nodes) is np.ndarray:
-            for node in nodes:
-                self.nodes = Node(self.max + 1 if self.max else 1, node)
+            else:
+                for nd in node:
+                    id = 1 if not self.max else self.max + 1
+                    self.setdefault(id, Node(id, nd))
 
         else:
-            message = (f"Nodes {str(nodes):s} must be either a list or tuple of Node types, " +
-                       f"not {str(type(nodes).__name__):s}.")
-            Error(message)
-            raise TypeError(message)
+            msg = (f"{type(self).__name__:s} Node must be of type Node, list, dict," +
+                   f"Nodes or np.ndarray, not \"{type(node).__name__:s}\".")
+            Error(msg)
+            raise TypeError(msg)
+
+    def __init__(self, nodes: [Node | list[list | Node] | dict[int, ArrayLike] | ArrayLike | Self] = None):
+        """
+        Nodes constructor
+        In:
+        nodes: 1) Node object
+               2) list of Node objects [Node, ... , Node]
+               3) list of lists [list, ... , list]
+                    if len(list) < 4, then [x [, y [, z]]], the missing values = 0.
+                    if len(list) == 4, then [id, x, y, z]
+               4) dict {id: Node}
+               5) dict {id: list}
+               6) dict {id: np.ndarray}
+               7) dict {id: {id, x, y, z}
+               8) dict {id: {id, coors}
+               9) np.ndarray of coors - vector of 1 node
+              10) np.ndarray of coors - each row a vector of 1 node
+        """
+        super().__init__(None, "Node", Node)
+        if nodes is not None:
+            self.__add(nodes)
 
     @property
     def coors(self) -> np.ndarray:
@@ -498,78 +709,137 @@ class Nodes(ContainerDict):
 
     @property
     def extents(self) -> [np.ndarray, np.ndarray]:
-        return np.min(self.coors, axis=0), np.max(self.coors, axis=0)
+        coors = self.coors
+        return np.min(coors, axis=0), np.max(coors, axis=0)
 
+    def tolist(self) -> list:
+        return [node.tolist() for node in self.values()]
 
-    def aslist(self) -> list:
-        coors = []
-        for nid in self.nodes.keys():
-            coors.append(list(self.nodes[nid].coors))
-        return coors
+    def todict(self) -> dict:
+        return {id: node.todict() for id, node in self.items()}
 
-    def asdict(self) -> dict:
-        coors = {}
-        for nid in self.nodes.keys():
-            coors.setdefault(nid, self.nodes[nid].coors)
-        return coors
+    def toarray(self) -> np.ndarray:
+        return np.array([node.coors for node in self.values()], dtype=float)
 
-    def asarray(self) -> np.ndarray:
-        return np.array(self.aslist(), dtype=float)
-
-    def transform(self, T: np.ndarray):
-        for nid in self.nodes.keys():
-            self.nodes[nid].transform(T)
-
-    def match(self, nodes) -> dict:
+    def transform(self, T: np.ndarray = None, O: np.ndarray = None):
         """
-        Match two sets of Nodes based on their coordinates (distance)
-        """
-        pass
+        transform all nodes using a transformation matrix and offset vector
 
-    def map_scalar(self, onodes: Self, scalar: dict,
+        x' = T @ (x - O)
+
+        """
+        if O is None:
+            O = np.zeros(3, dtype=float)
+
+        if T is None:
+            T = np.eye(3, dtype=float)
+
+        for nid in self.keys():
+            self[nid].transform(T, O)
+
+    def match(self, nodes, nodeID: int | list = None, distances: bool = False) -> list:
+        """
+        Match this set of Nodes to target set of nodes based on their coordinates (distance)
+
+        if nodeID is supplied, find the closest nodes to this node or a list of nodes
+
+        Returns the node ids from target that are closest to this set of nodes and
+        the distance of the found nodes if selected
+        """
+        if nodeID is None:
+            source = self.toarray()
+            source_keys = self.keys()
+        elif type(nodeID) is int:
+            source = self[nodeID].coors.reshape(1, 3)
+            source_keys = [nodeID]
+        elif type(nodeID) is list:
+            source = np.array([self[nID].coors for nID in nodeID], dtype=float)
+            source_keys = nodeID
+        else:
+            msg = (f"{type(self).__name__:s} match nodeID must be either None, int or a list "
+                   f"of ints, not ({type(nodeID).__name__:s}).")
+            Error(msg)
+            raise TypeErro(msg)
+
+        if type(nodes) is np.ndarray():
+            target = nodes
+            target_keys = list(range(len(nodes)))
+        elif type(nodes) is type(self):
+            target = nodes.toarray()
+            target_keys = nodes.keys()
+        else:
+            msg = (f"{type(self).__name__:s} match nodes must be either {type(self).__name__:s} "
+                   f"of np.ndarray, not ({type(nodes).__name__:s}).")
+            Error(msg)
+            raise TypeErro(msg)
+
+        tree = scipy.spatial.cKDTree(target)
+        distances, idx = tree.query(source)
+        matches = {source_keys[i]: target_keys[idx[i]] for i in range(len(source_keys))}
+
+        if distances:
+            distances = {source_keys[i]: distances[i] for i in range(len(source_keys))}
+            return matches, distances
+        else:
+            return matches
+
+    def replace(self, nodes, nodeID: int | list = None) -> list:
+        """
+        replace the coordinates of this set of nodes by closest coordinates found
+        in the supplied set of nodes
+        """
+        match = self.match_this(nodes, nodeID)
+        if type(nodes) is np.ndarray():
+            for source, target in match.items():
+                self[source].coors = nodes[target, :]
+        else:
+            for source, target in match.items():
+                self[source].coors = nodes[target].coors
+
+    def map_scalar(self, source: Self, scalar: dict,
                    cube_scale: float = 20., distances: bool = False,
                    max_distance: float = None) -> np.ndarray:
         """
         Map scalar from one set of nodes to these nodes
 
         In:
-            onodes - Nodes object with original nodes
-            scalar - dict with values on original nodes {nid, value}
+            source - Nodes object with source nodes
+            scalar - dict with values on source nodes {nid, value}
         """
         # create a cube for extrapolation
-        omin, omax = onodes.extents
-        nmin, nmax = self.extents
-        min = np.minimum(omin, nmin).flatten()
-        max = np.maximum(omax, nmax).flatten()
+        smin, smax = source.extents
+        tmin, tmax = self.extents    # target
+        min = np.minimum(smin, tmin).flatten()
+        max = np.maximum(smax, tmax).flatten()
 
-        avg, cube = self.__cuboid(max, min, scale=cube_scale)
+        avg, cube = self.__cuboid(min, max, scale=cube_scale)
 
         # pair original coordinates to scalar values and add the cuboid
-        odata = [(nid, onodes[nid].coors, scalar[nid]) for nid in onodes.keys()]
-        opoints = np.array([x[1] for x in odata], dtype=float)
-        ovalues = np.array([x[2] for x in odata], dtype=float)
-        mean = np.mean(ovalues, axis=0)
+        sdata = [(nid, source[nid].coors, scalar[nid]) for nid in source.keys()]
+        spoints = np.array([x[1] for x in sdata], dtype=float)
+        svalues = np.array([x[2] for x in sdata], dtype=float)
+        mean = np.mean(svalues, axis=0)
         cube_values = np.array([mean] * cube.shape[0], dtype=float)
-        opoints = np.concatenate((opoints, cube), axis=0)
-        ovalues = np.concatenate((ovalues, cube_values), axis=0)
+        spoints = np.concatenate((spoints, cube), axis=0)
+        svalues = np.concatenate((svalues, cube_values), axis=0)
 
         # prepare new nodes and their coordinates
-        ndata = [(nid, self.nodes[nid].coors) for nid in self.nodes.keys()]
-        nids = [x[0] for x in ndata]
-        npoints = np.array([x[1] for x in ndata], dtype=float)
+        tdata = [(nid, self[nid].coors) for nid in self.keys()]
+        tids = [x[0] for x in tdata]
+        tpoints = np.array([x[1] for x in tdata], dtype=float)
 
         # map values to new nodes
-        grid = scipy.interpolate.griddata(opoints, ovalues, npoints, method="linear")
+        grid = scipy.interpolate.griddata(spoints, svalues, tpoints, method="linear")
 
 
         # reformat mapped values to a dict {nid, value}
-        results = dict(list(zip(nids, grid)))
+        results = dict(list(zip(tids, grid)))
 
         # if closest distances are reuqested
         if distances:
-            tree = scipy.spatial.cKDTree(opoints)
-            xi = scipy.interpolate.interpnd._ndim_coords_from_arrays(npoints,
-                                                                     ndim=npoints.shape[1])
+            tree = scipy.spatial.cKDTree(spoints)
+            xi = scipy.interpolate.interpnd._ndim_coords_from_arrays(tpoints,
+                                                                     ndim=tpoints.shape[1])
             distances, indexes = tree.query(xi)
 
             # Copy original result but mask missing values with NaNs
@@ -577,124 +847,133 @@ class Nodes(ContainerDict):
                 grid2 = grid[:]
                 grid2[distances > max_distance] = np.nan
                 grid = grid2
-            distances = dict(list(zip(nids, distances)))
+            distances = dict(list(zip(tids, distances)))
 
         else:
             distances = None
 
-        return results, distances
+        if distances:
+            return results, distances
+        else:
+            return results
 
 
-    def map_vector(self, onodes: Self, vector: np.ndarray,
+    def map_vector(self, source: Self, vector: np.ndarray,
                    cube_scale: float = 20., distances: bool = False,
                    max_distance: float = None) -> np.ndarray:
         """
         Map vectors from one set of nodes to these nodes
 
         In:
-            onodes - Nodes object with original nodes
-            vector - dict with values on original nodes {nid, vector[n]}
+            source - Nodes object with source nodes
+            vector - dict with values on source nodes {nid, vector[m]}
         """
         # create a cube for extrapolation
-        omin, omax = onodes.extents
-        nmin, nmax = self.extents
-        min = np.minimum(omin, nmin).flatten()
-        max = np.maximum(omax, nmax).flatten()
+        smin, smax = source.extents
+        tmin, tmax = self.extents
+        min = np.minimum(smin, tmin).flatten()
+        max = np.maximum(smax, tmax).flatten()
 
-        avg, cube = self.__cuboid(max, min, scale=cube_scale)
+        avg, cube = self.__cuboid(min, max, scale=cube_scale)
 
         # pair original coordinates to scalar values and add the cuboid
-        odata = [(nid, onodes[nid].coors, vector[nid]) for nid in onodes.keys()]
-        opoints = np.array([x[1] for x in odata], dtype=float)
-        ovalues = np.array([x[2] for x in odata], dtype=float)
-        mean = np.mean(ovalues, axis=0)
-        cube_values = np.array([mean] * 8, dtype=float).reshape(-1, ovalues.shape[1])
-        opoints = np.concatenate((opoints, cube), axis=0)
-        ovalues = np.concatenate((ovalues, cube_values), axis=0)
+        sdata = [(nid, source[nid].coors, vector[nid]) for nid in source.keys()]
+        spoints = np.array([x[1] for x in sdata], dtype=float)
+        svalues = np.array([x[2] for x in sdata], dtype=float)
+        mean = np.mean(svalues, axis=0)
+        cube_values = np.array([mean] * 8, dtype=float).reshape(-1, svalues.shape[1])
+        spoints = np.concatenate((spoints, cube), axis=0)
+        svalues = np.concatenate((svalues, cube_values), axis=0)
 
         # prepare new nodes and their coordinates
-        ndata = [(nid, self.nodes[nid].coors) for nid in self.nodes.keys()]
-        nids = [x[0] for x in ndata]
-        npoints = np.array([x[1] for x in ndata], dtype=float)
+        tdata = [(nid, self[nid].coors) for nid in self.keys()]
+        tids = [x[0] for x in tdata]
+        tpoints = np.array([x[1] for x in tdata], dtype=float)
 
         # map values to new nodes
         grid = []
-        for n in range(ovalues.shape[1]):
-            grid.append(scipy.interpolate.griddata(opoints, ovalues[:,n], npoints, method="linear"))
+        for n in range(svalues.shape[1]):
+            grid.append(scipy.interpolate.griddata(spoints, svalues[:,n], tpoints, method="linear"))
 
 
         # reformat mapped values to a dict {nid, value}
         grid = np.array(list(zip(*grid)), dtype=float)
-        results = dict(list(zip(nids, grid)))
+        results = dict(list(zip(tids, grid)))
 
         # if closest distances are reuqested
         if distances:
-            tree = scipy.spatial.cKDTree(opoints)
-            xi = scipy.interpolate.interpnd._ndim_coords_from_arrays(npoints,
-                                                                     ndim=npoints.shape[1])
+            tree = scipy.spatial.cKDTree(spoints)
+            xi = scipy.interpolate.interpnd._ndim_coords_from_arrays(tpoints,
+                                                                     ndim=tpoints.shape[1])
             distances, indexes = tree.query(xi)
 
             # Copy original result but mask missing values with NaNs
             if max_distance:
                 grid2 = grid[:]
-                grid2[distances > max_distance] = np.nan
+                if len(grid.shape) > 1:
+                    grid2[distances > max_distance, :] = np.nan
+                else:
+                    grid2[distances > max_distance] = np.nan
                 grid = grid2
-            distances = dict(list(zip(nids, distances)))
+            distances = dict(list(zip(tids, distances)))
 
         else:
             distances = None
 
-        return results, distances
+        if distances:
+            return results, distances
+        else:
+            return results
 
-    def map_tensor(self, onodes: Self, tensor: np.ndarray,
+    def map_tensor(self, source: Self, tensor: np.ndarray,
                    cube_scale: float = 20., distances: bool = False,
                    max_distance: float = None) -> np.ndarray:
         """
-        Map tensors from one set of nodes to these nodes
+        Map tensor from one set of nodes to these nodes
 
         In:
-            onodes - Nodes object with original nodes
-            tensor - dict with values on original nodes {nid, tensor[m x n]}
+            source - Nodes object with source nodes
+            tensor - dict with values on source nodes {nid, tensor[m x n]}
         """
         # create a cube for extrapolation
-        omin, omax = onodes.extents
-        nmin, nmax = self.extents
-        min = np.minimum(omin, nmin).flatten()
-        max = np.maximum(omax, nmax).flatten()
+        smin, smax = source.extents
+        tmin, tmax = self.extents
+        min = np.minimum(smin, tmin).flatten()
+        max = np.maximum(smax, tmax).flatten()
 
         avg, cube = self.__cuboid(max, min, scale=cube_scale)
 
         # pair original coordinates to scalar values and add the cuboid
-        odata = [(nid, onodes[nid].coors, tensor[nid]) for nid in onodes.keys()]
-        opoints = np.array([x[1] for x in odata], dtype=float)
-        ovalues = np.array([x[2] for x in odata], dtype=float)
+        sdata = [(nid, source[nid].coors, tensor[nid]) for nid in source.keys()]
+        spoints = np.array([x[1] for x in sdata], dtype=float)
+        svalues = np.array([x[2] for x in sdata], dtype=float)
 
-        oshape = ovalues.shape
+        tshape = svalues.shape
 
-        if len(ovalues.shape) == 1:
-            ovalues = ovalues.reshape(ovalues.shape[0], 1, 1)
+        if len(svalues.shape) == 1:
+            svalues = svalues.reshape(svalues.shape[0], 1, 1)
             value_type = "scalar"
-        elif len(ovalues.shape) == 2:
-            ovalues = ovalues.reshape(ovalues.shape[0], 1, ovalues.shape[1])
+        elif len(svalues.shape) == 2:
+            svalues = svalues.reshape(svalues.shape[0], 1, svalues.shape[1])
             value_type = "vector"
         else:
             value_type = "tensor"
 
-        mean = np.mean(ovalues, axis=0)
-        cube_values = np.array([mean] * cube.shape[0], dtype=float).reshape(-1, ovalues.shape[1], ovalues.shape[2])
-        opoints = np.concatenate((opoints, cube), axis=0)
-        ovalues = np.concatenate((ovalues, cube_values), axis=0)
+        mean = np.mean(svalues, axis=0)
+        cube_values = np.array([mean] * cube.shape[0], dtype=float).reshape(-1, svalues.shape[1], svalues.shape[2])
+        spoints = np.concatenate((spoints, cube), axis=0)
+        svalues = np.concatenate((svalues, cube_values), axis=0)
 
         # prepare new nodes and their coordinates
-        ndata = [(nid, self.nodes[nid].coors) for nid in self.nodes.keys()]
-        nids = [x[0] for x in ndata]
-        npoints = np.array([x[1] for x in ndata], dtype=float)
+        tdata = [(nid, self[nid].coors) for nid in self.keys()]
+        tids = [x[0] for x in tdata]
+        tpoints = np.array([x[1] for x in tdata], dtype=float)
 
         # map values to new nodes
-        grid = np.empty((npoints.shape[0], ovalues.shape[1], ovalues.shape[2]), dtype=float)
-        for m in range(ovalues.shape[1]):
-            for n in range(ovalues.shape[2]):
-                grid[:,m,n] = scipy.interpolate.griddata(opoints, ovalues[:,m,n], npoints, method="linear")
+        grid = np.empty((tpoints.shape[0], svalues.shape[1], svalues.shape[2]), dtype=float)
+        for m in range(svalues.shape[1]):
+            for n in range(svalues.shape[2]):
+                grid[:,m,n] = scipy.interpolate.griddata(spoints, svalues[:,m,n], tpoints, method="linear")
 
         if value_type == "scalar":
             grid = grid.reshape(grid.shape[0])
@@ -702,26 +981,32 @@ class Nodes(ContainerDict):
             grid = grid.reshape(grid.shape[0], -1)
 
         # reformat mapped values to a dict {nid, value}
-        results = dict(list(zip(nids, grid)))
+        results = dict(list(zip(tids, grid)))
 
         # if closest distances are reuqested
         if distances:
-            tree = scipy.spatial.cKDTree(opoints)
-            xi = scipy.interpolate.interpnd._ndim_coords_from_arrays(npoints,
-                                                                     ndim=npoints.shape[1])
+            tree = scipy.spatial.cKDTree(spoints)
+            xi = scipy.interpolate.interpnd._ndim_coords_from_arrays(tpoints,
+                                                                     ndim=tpoints.shape[1])
             distances, indexes = tree.query(xi)
 
             # Copy original result but mask missing values with NaNs
             if max_distance:
                 grid2 = grid[:]
-                grid2[distances > max_distance] = np.nan
+                if len(grid.shape) > 1:
+                    grid2[distances > max_distance, :] = np.nan
+                else:
+                    grid2[distances > max_distance] = np.nan
                 grid = grid2
-            distances = dict(list(zip(nids, distances)))
+            distances = dict(list(zip(tids, distances)))
 
         else:
             distances = None
 
-        return results, distances
+        if distances:
+            return results, distances
+        else:
+            return results
 
 
 
@@ -1771,9 +2056,13 @@ class Properties(ContainerDict):
 
 # TODO:
 class CLoad(Id):
-    def __init__(self, fetype: str, nid: int, lpat: int,
+    # def __init__(self, fetype: str, nid: int, lpat: int,
+    #              Fx: float = None, Fy: float = None, Fz: float = None,
+    #              Mx: float = None, My: float = None, Mz: float = None):
+    def __init__(self, nid: int, lpat: int,
                  Fx: float = None, Fy: float = None, Fz: float = None,
-                 Mx: float = None, My: float = None, Mz: float = None):
+                 Mx: float = None, My: float = None, Mz: float = None,
+                 *args, **kwargs):
         super().__init__(nid)
         self.lpat = lpat
         self.F = [Fx, Fy, Fz, Mx, My, Mz]
@@ -1884,10 +2173,11 @@ class CLoad(Id):
             self._F = np.array(F, dtype=float)
 
     def aslist(self) -> list:
-        return [self.node, self.lpat, *(self.F.tolist())]
+        return ["conload", self.node, self.lpat, *(self.F.tolist())]
 
     def asdict(self) -> dict:
-        return {"nid": self.node,
+        return {"fetype": "conload",
+                "nid": self.node,
                 "lpat": self.lpat,
                 "Fx": self.F[0],
                 "Fy": self.F[0],
@@ -2018,7 +2308,6 @@ class Loading:
             lpat = load.lpat
             if lpat not in self._nodal.keys():
                 self.nodal[lpat] = LoadsN(lpat, load)
-
             else:
                 self.nodal[lpat].loads = load
 
@@ -2027,52 +2316,38 @@ class Loading:
             lpat = load.lpat
             if lpat not in self._nodal.keys():
                 self._nodal[lpat] = load
-
             else:
                 self._nodal[lpat] += load
 
         # [load_1, load_2, ... , load_n]
         # TODO:
         elif type(load) in (tuple, list):
+            # [conload, nid, lpat, Fx .. Mz]
+            if type(load[0]) is str and load[0] == "conload" and len(load) == 9:
+                self.nodal[load[1]] = CLoad(*load[1:])
             # [nid, lpat, Fx .. Mz]
-            if type(load[0]) is int and len(load) == 8:
+            elif type(load[0]) is int and len(load) == 8:
                 self.nodal[load[1]] = CLoad(*load)
-
             else:
-                for l in load:
-                    # [CLoad_1, ... , CLoad_2]
-                    if type(l) is CLoad:
-                        self.nodal[l.lpat] = l
+                for ld in load:
+                    self.nodal = ld
 
-                    # [[nid, lpat, Fx .. Mz]]
-                    elif type(l) in (tuple, list):
-                        lpat = l[1]
-                        self.nodal[lpat] = CLoad(*l)
-
-                    # [{nid, lpat, Fx .. Mz}]
-                    elif type(l) is dict:
-                        self.nodal[l["lpat"]] = CLoad(**l)
-
-                    else:
-                        message = (f"{type(self).__name__:s} Nodal Loads type must be a list " +
-                                   f"of lists not {type(load).__name__:s}({type(l).__name__:s}) " +
-                                   f"- {str(l):s}.")
-                        Error(message)
-                        raise TypeError(message)
-
+        # {lpat: {nid: {fetype, nid, lpat, Fx, ... , Mz}}}
+        # {lpat: [[fetype, nid, lpat, Fx, ... , Fz]]}
+        # {lpat: CLoad | LoadsN}
         elif type(load) is dict:
-            for lpat, l in load.items():
-                # {lpat: [[nid, lpat, Fx ... Mz]]}
-                if type(l) in (tuple, list):
-                    self.nodal = l
+            for lpat, ld in load.items():
+                # {lpat: [[fetype, nid, lpat, Fx ... Mz]]}
+                if type(ld) in (tuple, list):
+                    self.nodal = ld
 
-                # {lpat: {nid: {nid, lpat, Fx .. Mz}}}
-                elif type(l) is dict:
-                    self.nodal = LoadsN(lpat, l)
+                # {lpat: {nid: {fetype, nid, lpat, Fx .. Mz}}}
+                elif type(ld) is dict:
+                    self.nodal = LoadsN(lpat, ld)
 
                 # {lpat: CLoad | LoadsN}
-                elif type(l) in (CLoad, LoadsN):
-                    self.nodal = l
+                elif type(ld) in (CLoad, LoadsN):
+                    self.nodal = ld
 
                 else:
                     message = (f"{type(self).__name__:s} Nodal Loads type must be a tuple, " +
@@ -2230,25 +2505,13 @@ class Optimisation(Solver):
 
 
 if __name__ == "__main__":
-    # coors = np.random.rand(20, 3)
-    # print(f"{coors = }")
-    # nodes = Nodes({i+1: coors for i, coor in enumerate(coors)})
-    # print(f"{nodes.coors = }")
-    # print(f"{nodes.extents = }")
-    # Info("Info")
-    # Warn("Warning")
-    # Error("Error")
+    import pdb
+    a = np.random.randint(0, 100, (100, 3)).astype(float)
+    b = np.random.randint(0, 100, (100, 3)).astype(float)
 
-    # m = MaterialISO("stahl", 210000., 0.3, 7.85e-9, 1.2e-5)
+    na = Nodes(a)
+    nb = Nodes(b)
 
-    # pb = PBeam("ipe", 1000., 1000000., 1000000., 1000000., 0.05)
-
-    import os
-    import sys
-    sys.path.append("../../../tests/unit/")
-    from _models import nodal_loads
-
-    loads = LoadsN(nodal_loads[0]["lpat"], nodal_loads)
-    print(loads.aslist())
-    print(loads.asdict())
+    pdb.set_trace()
+    print(f"{na.match(nb) = }")
 
