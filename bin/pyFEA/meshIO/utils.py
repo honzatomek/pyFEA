@@ -2,6 +2,8 @@
 import typing
 from math import pi, sin, cos, tan, asin, acos, atan2
 import numpy as np
+import scipy
+import matplotlib.pyplot as plt
 
 
 def pad_with_zeros(*args, dtype=float) -> tuple[np.ndarray]:
@@ -215,26 +217,239 @@ def distance_line_to_line(A1: list | np.ndarray,
         return np.linalg.norm(P1, P2)
 
 
-# TODO:
-def reverse_cuthill_mckee():
+def reverse_cuthill_mckee(A: np.ndarray, reorder: bool = False):
+    """
+    Reverse Cuthill-McKee algorithm for reordering matrix for smallest
+    badwidth
+    """
+
+    def getAdjacency(Mat: np.ndarray):
+        """
+        return the adjacncy matrix for each node
+        """
+        adj = [0] * Mat.shape[0]
+        for i in range(Mat.shape[0]):
+            q = np.flatnonzero(Mat[i])
+            q = list(q)
+            q.pop(q.index(i))
+            adj[i] = q
+        return adj
+
+    def getDegree(Graph: np.ndarray):
+        """
+        find the degree of each node. That is the number
+        of neighbours or connections.
+        (number of non-zero elements) in each row minus 1.
+        Graph is a Cubic Matrix.
+        """
+        degree = [0]*Graph.shape[0]
+        for row in range(Graph.shape[0]):
+            degree[row] = len(np.flatnonzero(Graph[row]))-1
+        return degree
+
+    def RCM_loop(deg, start, adj, pivots, R):
+        """
+        Reverse Cuthil McKee ordering of an adjacency Matrix
+        """
+        digar = np.array(deg)
+        # use np.where here to get indecies of minimums
+        if start not in R:
+            R.append(start)
+        Q = adj[start]
+        for idx, item in enumerate(Q):
+            if item not in R:
+                R.append(item)
+        Q = adj[R[-1]]
+        if set(Q).issubset(set(R)) and len(R) < len(deg) :
+            p = pivots[0]
+            pivots.pop(0)
+            return RCM_loop(deg, p, adj, pivots, R)
+        elif len(R) < len(deg):
+            return RCM_loop(deg, R[-1], adj, pivots, R)
+        else:
+            R.reverse()
+            return R
+
+    # define the Result queue
+    R = ["C"] * A.shape[0]
+    adj = getAdjacency(A)
+    degree = getDegree(A)
+    digar = np.array(degree)
+    pivots = list(np.where(digar == digar.min())[0])
+    inl = []
+
+    P = np.array(RCM_loop(degree, 0, adj, pivots, inl))
+    if reorder:
+        B = np.array(A)
+        for i in range(B.shape[0]):
+            B[:, i] = B[P, i]
+        for i in range(B.shape[0]):
+            B[i, :] = B[i, P]
+        return P, B
+    else:
+        return P
+
+
+
+def gramm_schmidt():
     pass
 
 
 
-def max_value():
-    pass
+def MAC(vector1: list | dict | np.ndarray, vector2: list | dict | np.ndarray) -> float:
+    """
+    Returns the MAC value of two vectors
+
+    MAC = (A . B)^2 / ((A . A) * (B . B))
+    """
+    if type(vector1) is dict:
+        A = np.array([v for k, v in vector1.items()], dtype = float).flatten()
+    else:
+        A = np.array(vector1, dtype=float).flatten()
+
+    if type(vector1) is dict:
+        B = np.array([v for k, v in vector2.items()], dtype = float).flatten()
+    else:
+        B = np.array(vector2, dtype=float).flatten()
+
+    mac = (np.dot(A, B) ** 2) / (np.dot(A, A) * np.dot(B, B))
+    return mac
 
 
 
-def max_matrix():
-    pass
+def MACMatrix(bData: dict, cData: dict) -> np.ndarray:
+    """
+    Creates the MAC matrix between two sets of vectors
+
+    Returns:
+        bkeys - row headers
+        ckeys - column headers
+        macM  - np.ndarray MAC matrix
+    """
+    bkeys = list(bData.keys())
+    ckeys = list(cData.keys())
+
+    macM = []
+    for bkey in bkeys:
+        bkeyData = bData[bkey]
+        v = []
+        for ckey in ckeys:
+            ckeyData = cData[ckey]
+            v.append(MAC(bkeyData, ckeyData))
+        macM.append(v)
+    return bkeys, ckeys, np.array(macM, dtype=float)
 
 
 
-def mapping():
-    pass
+def mapping(source: np.ndarray, values: np.ndarray, target: np.ndarray,
+            cube_scale: float = 20., distances: bool = False,
+            max_distance: float = None) -> np.ndarray:
+    """
+    Map scalar/vector/tensor from source coordinates to target coordinates
+
+    In:
+        source       - source coordinates [np.ndarray]
+        values       - values on source coordinates [np.ndarray]
+        target       - target coordinates [np.ndarray]
+        cube_scale   - model extents multiplier to create bounding box of
+                       average values around the model so as to not extrapolate
+        distances    - calculate the closest distances between the two sets of
+                       coordinates
+        max_distance - maximum distance for the mapping
+    """
+    spoints = np.array(source, dtype=float)
+    tpoints = np.array(target, dtype=float)
+
+    if source.shape[0] != values.shape[0]:
+        raise ValueError(f"The number of values must match the number of source " +
+                         f"coordinates {values.shape[0]:n} != {source.shape[0]:n}.")
+
+    # create a cuboid for extrapolation
+    smin, smax = np.min(source, axis=0), np.max(source, axis=0)
+    tmin, tmax = np.min(target, axis=0), np.max(target, axis=0)
+    min = np.minimum(smin, tmin).flatten()
+    max = np.maximum(smax, tmax).flatten()
+    avg = (min + max) / 2.
+    cube = np.zeros((8, 3), dtype=float)
+    cube[0] = (np.array([max[0], max[1], max[2]], dtype=float) - avg) * cube_scale + avg
+    cube[1] = (np.array([min[0], max[1], max[2]], dtype=float) - avg) * cube_scale + avg
+    cube[2] = (np.array([min[0], min[1], max[2]], dtype=float) - avg) * cube_scale + avg
+    cube[3] = (np.array([max[0], min[1], max[2]], dtype=float) - avg) * cube_scale + avg
+    cube[4] = (np.array([max[0], min[1], min[2]], dtype=float) - avg) * cube_scale + avg
+    cube[5] = (np.array([min[0], min[1], min[2]], dtype=float) - avg) * cube_scale + avg
+    cube[6] = (np.array([max[0], max[1], min[2]], dtype=float) - avg) * cube_scale + avg
+    cube[7] = (np.array([min[0], max[1], min[2]], dtype=float) - avg) * cube_scale + avg
+
+
+    # select the value type
+    if len(values.shape) == 1:
+        svalues = values.reshape(values.shape[0], 1, 1)
+        value_type = "scalar"
+    elif len(values.shape) == 2:
+        svalues = values.reshape(values.shape[0], 1, values.shape[1])
+        value_type = "vector"
+    else:
+        svalues = values.copy()
+        value_type = "tensor"
+
+    # pair original coordinates to scalar values and add the cuboid
+    mean = np.mean(svalues, axis=0)
+    cube_values = np.array([mean] * cube.shape[0],
+                           dtype=float).reshape(-1, svalues.shape[1], svalues.shape[2])
+    spoints = np.concatenate((spoints, cube), axis=0)
+    svalues = np.concatenate((svalues, cube_values), axis=0)
+
+    # map values to new nodes
+    grid = np.empty((tpoints.shape[0], svalues.shape[1], svalues.shape[2]), dtype=float)
+    for m in range(svalues.shape[1]):
+        for n in range(svalues.shape[2]):
+            grid[:,m,n] = scipy.interpolate.griddata(spoints, svalues[:,m,n], tpoints, method="linear")
+
+    # reshape the interpolated values back to the original shape
+    if value_type == "scalar":
+        grid = grid.reshape(grid.shape[0])
+    elif value_type == "vector":
+        grid = grid.reshape(grid.shape[0], -1)
+
+    # if closest distances are reuqested
+    if distances:
+        tree = scipy.spatial.cKDTree(spoints)
+        xi = scipy.interpolate.interpnd._ndim_coords_from_arrays(tpoints,
+                                                                 ndim=tpoints.shape[1])
+        distances, indexes = tree.query(xi)
+
+        # Copy original result but mask missing values with NaNs
+        if max_distance:
+            grid2 = grid[:]
+            if len(grid.shape) > 1:
+                grid2[distances > max_distance, :] = np.nan
+            else:
+                grid2[distances > max_distance] = np.nan
+            grid = grid2
+        distances = dict(list(zip(tids, distances)))
+
+    else:
+        distances = None
+
+    if distances:
+        return grid, distances
+    else:
+        return grid
 
 
 
 if __name__ == "__main__":
+    A = np.diag(np.ones(8))
+    nzc = [[4], [2, 5, 7], [1, 4], [6], [0, 2], [1, 7], [3], [1, 5]]
 
+    for i in range(len(nzc)):
+        for j in nzc[i]:
+            A[i, j] = 1
+
+    fig, axs = plt.subplots(1, 2)
+
+    P, B = reverse_cuthill_mckee(A, reorder=True)
+    axs[0].spy(A, color="black", marker="s")
+    axs[1].spy(B, color="red", marker="s")
+
+    plt.show()
