@@ -35,3 +35,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
+## TODO
+- unv file sequential reading and writing - the block method might take too much
+  memory
+- CSys late creation of the transformation matrix - what if it is defined in
+  cylindrical coordinates

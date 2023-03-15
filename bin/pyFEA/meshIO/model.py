@@ -321,7 +321,9 @@ class ContainerDict:
         return list(self.__dict.values())
 
 
-
+# TODO:
+# late comutation of the axis and transformations - what if it is defined in
+# cylindrical coordinates?
 class Cartesian(Id):
     _possible_formulation = ("xy", "yx", "xz", "zx", "yz", "zy")
     _possible_definition = ("point", "vector")
