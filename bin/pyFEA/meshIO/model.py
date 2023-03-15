@@ -51,6 +51,8 @@ try:
     from typing import Self
 except ImportError:
     from typing_extensions import Self
+
+from math import pi, sin, cos, tan, asin, acos, atan2, radians, degrees
 import numpy as np
 from numpy.typing import ArrayLike
 import scipy.interpolate
@@ -211,7 +213,7 @@ class ContainerDict(dict):
 
 class ContainerDict:
     def __init__(self, key_name: str, key_type: [tuple[type] | list[type] | type],
-                 value_name: str, value_type: [tuple[type] | list[type] | type]):
+                       value_name: str, value_type: [tuple[type] | list[type] | type]):
         self.__key_name = str(key_name)
         if key_type not in (tuple, list):
             self.__key_type = tuple([key_type])
@@ -321,119 +323,220 @@ class ContainerDict:
 
 
 class Cartesian(Id):
-    def __init__(self, id: int, origin: list | np.ndarray, axis1: list | np.ndarray,
-                 axis2: list | np.ndarray, definition: str = "xy")
+    _possible_formulation = ("xy", "yx", "xz", "zx", "yz", "zy")
+    _possible_definition = ("point", "vector")
+
+    def __init__(self, id: int, csys: int, origin: list | np.ndarray,
+                 axis: list | np.ndarray, plane: list | np.ndarray,
+                 form: str = "xy", definition: str = "point"):
         super().__init__(id)
 
-        if definition == "xy":
-            o = np.array(origin, dtype=float)
-            x = np.array(axis1, dtype=float) - o
-            x /= np.linalg.norm(x)
-            y = np.array(axis2, dtype=float) - o
-            y /= np.linalg.norm(y)
-            z = np.cross(x, y)
-            z /= np.linalg.norm(z)
-            y = np.cross(z, x)
-            y /= np.linalg.norm(y)
-        elif definition == "yx":
-            o = np.array(origin, dtype=float)
-            y = np.array(axis1, dtype=float) - o
-            y /= np.linalg.norm(y)
-            x = np.array(axis2, dtype=float) - o
-            x /= np.linalg.norm(x)
-            z = np.cross(x, y)
-            z /= np.linalg.norm(z)
-            x = np.cross(y, z)
-            x /= np.linalg.norm(x)
-        elif definition == "xz":
-            o = np.array(origin, dtype=float)
-            x = np.array(axis1, dtype=float) - o
-            x /= np.linalg.norm(x)
-            z = np.array(axis2, dtype=float) - o
-            z /= np.linalg.norm(z)
-            y = np.cross(z, x)
-            y /= np.linalg.norm(y)
-            z = np.cross(x, y)
-            z /= np.linalg.norm(z)
-        elif definition == "zx":
-            o = np.array(origin, dtype=float)
-            z = np.array(axis1, dtype=float) - o
-            z /= np.linalg.norm(z)
-            x = np.array(axis2, dtype=float) - o
-            x /= np.linalg.norm(x)
-            y = np.cross(z, x)
-            y /= np.linalg.norm(y)
-            x = np.cross(y, z)
-            x /= np.linalg.norm(x)
-        elif definition == "yz":
-            o = np.array(origin, dtype=float)
-            y = np.array(axis1, dtype=float) - o
-            y /= np.linalg.norm(y)
-            z = np.array(axis2, dtype=float) - o
-            z /= np.linalg.norm(z)
-            x = np.cross(y, z)
-            x /= np.linalg.norm(x)
-            z = np.cross(x, y)
-            z /= np.linalg.norm(z)
-        elif definition == "zy":
-            o = np.array(origin, dtype=float)
-            z = np.array(axis1, dtype=float) - o
-            z /= np.linalg.norm(z)
-            y = np.array(axis2, dtype=float) - o
-            y /= np.linalg.norm(y)
-            x = np.cross(y, z)
-            x /= np.linalg.norm(x)
-            y = np.cross(z, x)
-            y /= np.linalg.norm(y)
+        if not type(csys) is int:
+            msg = (f"{type(self).__name__:s} CSys ID must be of type int, " +
+                   f"not {type(csys).__name__:s}.")
+            Error(msg)
+            raise TypeError(msg)
+        elif csys < 0:
+            msg = (f"{type(self).__name__:s} CSys ID must be > 0, " +
+                   f"not {csys:n}.")
+            Error(msg)
+            raise ValueError(msg)
         else:
+            self._csys = csys
+
+        if type(form) is not str:
+            msg = (f"{type(self).__name__:s} formulation must be a str " +
+                   f"not {type(form).__name__:s}.")
+            Error(msg)
+            raise TypeError(msg)
+        elif form not in type(self)._possible_formulation:
+            msg = (f"{type(self).__name__:s} formulation can be only one of " +
+                   f"({', '.join(type(self)._possible_formulation):s}), " +
+                   f"not {str(form):s}.")
+            Error(msg)
+            raise ValueError(msg)
+
+        if type(definition) is not str:
+            msg = (f"{type(self).__name__:s} definition must be a str " +
+                   f"not {type(definition).__name__:s}.")
+            Error(msg)
+            raise TypeError(msg)
+        elif definition not in type(self)._possible_definition:
             msg = (f"{type(self).__name__:s} definition can be only one of " +
-                   f"({', '.join(['xy', 'yx', 'xz', 'zx', 'yz', 'zy']):s}), " +
+                   f"({', '.join(type(self)._possible_definition):s}), " +
                    f"not {str(definition):s}.")
             Error(msg)
             raise ValueError(msg)
+
+        o = np.array(origin, dtype=float)
+        if definition == "point":
+            v1 = np.array(axis, dtype=float) - o
+            v1 /= np.linalg.norm(v1)
+            v2 = np.array(plane, dtype=float) - o
+            v2 /= np.linalg.norm(v2)
+        elif definition == "vector":
+            v1 = np.array(axis, dtype=float)
+            v1 /= np.linalg.norm(v1)
+            v2 = np.array(plane, dtype=float)
+            v2 /= np.linalg.norm(v2)
+
+        if form == type(self)._possible_formulation[0]:
+            x = v1
+            y = v2
+            z = np.cross(x, y)
+            z /= np.linalg.norm(z)
+            y = np.cross(z, x)
+            y /= np.linalg.norm(y)
+        elif form == type(self)._possible_formulation[1]:
+            y = v1
+            x = v2
+            z = np.cross(x, y)
+            z /= np.linalg.norm(z)
+            x = np.cross(y, z)
+            x /= np.linalg.norm(x)
+        elif form == type(self)._possible_formulation[2]:
+            x = v1
+            z = v2
+            y = np.cross(z, x)
+            y /= np.linalg.norm(y)
+            z = np.cross(x, y)
+            z /= np.linalg.norm(z)
+        elif form == type(self)._possible_formulation[3]:
+            z = v1
+            x = v2
+            y = np.cross(z, x)
+            y /= np.linalg.norm(y)
+            x = np.cross(y, z)
+            x /= np.linalg.norm(x)
+        elif form == type(self)._possible_formulation[4]:
+            y = v1
+            z = v2
+            x = np.cross(y, z)
+            x /= np.linalg.norm(x)
+            z = np.cross(x, y)
+            z /= np.linalg.norm(z)
+        elif form == type(self)._possible_formulation[5]:
+            z = v1
+            y = v2
+            x = np.cross(y, z)
+            x /= np.linalg.norm(x)
+            y = np.cross(z, x)
+            y /= np.linalg.norm(y)
 
         self._o = o
         self._x = x
         self._y = y
         self._z = z
 
-    @property
-    def T(self) -> np.ndarray:
-        return np.hstack((self._x, self._y, self._z))
+    def __matmul__(self, csys):
+        """
+        Transformation of the coordinate system, CSYS2 is the supplied one, CSYS1 is
+        this one
+
+        CSYS1 =  in csys O: [1, 0, 0], axes [[ 0, 1, 0], [-1, 0, 0], [0, 0, 1]]
+        CSYS2 =  in csys 1: [1, 0, 0], axes [[-1, 0, 0], [ 0,-1, 0], [0, 0, 1]]
+
+        # TODO:
+        result should be O: [1, 1, 0], axes [[ 0,-1, 0], [ 1, 0, 0], [0, 0, 1]]
+        """
+        self._transform(csys)
+        return self
+
+
+    def _transform(self, csys):
+        T = csys.T
+        self._o = T.T @ self._o + csys._o
+        self._x, self._y, self._z = [self._x, self._y, self._z] @ T
+        self._csys = csys.csys
 
     @property
-    def o(self) -> np.ndarray:
+    def csys(self) -> int:
+        return self._csys
+
+    @property
+    def T(self) -> np.ndarray:
+        return np.vstack((self._x, self._y, self._z))
+
+    @property
+    def O(self) -> np.ndarray:
         return self._o
 
     @property
-    def x(self) -> np.ndarray:
+    def X(self) -> np.ndarray:
         return self._x
 
     @property
-    def y(self) -> np.ndarray:
+    def Y(self) -> np.ndarray:
         return self._y
 
     @property
-    def z(self) -> np.ndarray:
+    def Z(self) -> np.ndarray:
         return self._z
 
     def transform_to(self, coordinates) -> np.ndarray:
         """
         transforms coordinates to this csys
         """
-        return self.T @ (coordinates - self.o)
+        return (coordinates - self._o) @ self.T.T
 
     def transform_from(self, coordinates) -> np.ndarray:
         """
         transforms coordinates from this csys
         """
-        return (self.T.T @ coordinates) + self.o
+        return (coordinates @ self.T) + self._o
+
+
+
+class Cylindrical(Cartesian):
+    _possible_formulation = ("rphi", "phir", "rz", "zr", "phiz", "zphi")
+
+    def __init__(self, id: int, defID: int, origin: list | np.ndarray,
+                 axis: list | np.ndarray, plane: list | np.ndarray,
+                 form: str = "rphi", definition: str = "point"):
+        super().__init__(id, defID, origin, axis, plane, form, definition)
+
+    def transform_to(self, coordinates) -> np.ndarray:
+        """
+        transforms coordinates to this csys
+        """
+        coor = self.T @ (coordinates - self.O)
+        r = (coor[0] ** 2 + coor[1] ** 2) ** 0.5
+        phi = atan2(coor[1], coor[0])
+        z = coor[2]
+        return np.array([r, phi, z], dtype=float)
+
+    def transform_from(self, coordinates) -> np.ndarray:
+        """
+        transforms coordinates from this csys
+        """
+        x = coordinates[0] * cos(coordinates[1])
+        y = coordinates[0] * sin(coordinates[1])
+        z = coordinates[2]
+
+        return (self.T.T @ [x, y, z]) + self.O
+
+    @property
+    def R(self) -> np.ndarray:
+        return self._x
+
+    @property
+    def P(self) -> np.ndarray:
+        return self._y
+
+    @property
+    def X(self) -> np.ndarray:
+        raise AttributeError(f"'{type(self).__name__:s}' object has no attribute 'X'.")
+
+    @property
+    def Y(self) -> np.ndarray:
+        raise AttributeError(f"'{type(self).__name__:s}' object has no attribute 'Y'.")
 
 
 
 class Node(Id):
     def __init__(self, id: int, coors: ArrayLike = None,
-                 x: float = None, y: float = None, z: float = None):
+                 x: float = None, y: float = None, z: float = None,
+                 defcsys: int = 0, outcsys: int = 0):
         super().__init__(id)
         if coors is not None:
             self.coors = coors
@@ -442,6 +545,33 @@ class Node(Id):
             y = 0. if y is None else y
             z = 0. if z is None else z
             self.coors = [x, y, z]
+
+        if type(defcsys) is not int:
+            msg = (f"{type(self).__name__:s} definition CSys must be of type int, " +
+                   f"not {type(defcsys).__name__:s}.")
+            Error(msg)
+            raise TypeError(msg)
+        elif defcsys < 0:
+            msg = (f"{type(self).__name__:s} definition CSys must be >= 0, " +
+                   f"not {defcsys:n}.")
+            Error(msg)
+            raise ValueError(msg)
+        else:
+            self._defcsys = defcsys
+
+        if type(outcsys) is not int:
+            msg = (f"{type(self).__name__:s} output CSys must be of type int, " +
+                   f"not {type(outcsys).__name__:s}.")
+            Error(msg)
+            raise TypeError(msg)
+        elif outcsys < 0:
+            msg = (f"{type(self).__name__:s} output CSys must be >= 0, " +
+                   f"not {outcsys:n}.")
+            Error(msg)
+            raise ValueError(msg)
+        else:
+            self._outcsys = outcsys
+
 
     def __str__(self) -> str:
         return f"Node ID {self.id:n}"
@@ -517,6 +647,14 @@ class Node(Id):
             Warn(message)
             coors = np.hstack((coors, [0.] * (3 - len(coors))))
         self._coors = np.array(coors, dtype=float).flatten()
+
+    @property
+    def defcsys(self) -> int:
+        return self._defcsys
+
+    @property
+    def outcsys(self) -> int:
+        return self._outcsys
 
     def transform(self, T: np.ndarray = None, O: np.ndarray = None):
         """
@@ -736,6 +874,12 @@ class Nodes(DictID):
 
         for nid in self.keys():
             self[nid].transform(T, O)
+
+        # TODO:
+        # might be faster
+        # transformed = (self.asarray() - O) @ T.T
+        # for i, nid in enumerate(self.keys()):
+        #     self[nid].coors = transformed[i]
 
     def match(self, nodes, nodeID: int | list = None, distances: bool = False) -> list:
         """
@@ -2505,13 +2649,41 @@ class Optimisation(Solver):
 
 
 if __name__ == "__main__":
-    import pdb
-    a = np.random.randint(0, 100, (100, 3)).astype(float)
-    b = np.random.randint(0, 100, (100, 3)).astype(float)
+    csys1 = Cartesian(1, 0, [1, 0, 0], [ 1, 1, 0], [0, 0, 0], form="xy")
+    csys2 = Cartesian(2, 1, [1, 0, 0], [ 0, 0, 0], [0,-1, 0], form="xy")
 
-    na = Nodes(a)
-    nb = Nodes(b)
+    csys3 = Cylindrical(1, 0, [1, 0, 0], [ 0, 1, 0], [-1, 0, 0], form="rphi", definition="vector")
+    csys4 = Cylindrical(2, 1, [1, 0, 0], [-1, 0, 0], [ 0,-1, 0], form="rphi", definition="vector")
 
-    pdb.set_trace()
-    print(f"{na.match(nb) = }")
+    assert np.array_equal(csys1.O, csys3.O)
+    assert np.array_equal(csys1.X, csys3.R)
+    assert np.array_equal(csys1.Y, csys3.P)
+    assert np.array_equal(csys1.Z, csys3.Z)
+
+    assert np.array_equal(csys2.O, csys4.O)
+    assert np.array_equal(csys2.X, csys4.R)
+    assert np.array_equal(csys2.Y, csys4.P)
+    assert np.array_equal(csys2.Z, csys4.Z)
+
+    csys5 = Cylindrical(1, 0, [0, 0, 0], [ 1, 0, 0], [ 0, 1, 0], form="rphi", definition="vector")
+
+    print(f"{csys5.transform_to([2, 2, 0]) = }")
+    print(f"{csys5.transform_from([2 ** 0.5, pi/4, 0]) = }")
+
+    T = csys3.T
+    O = csys3.O
+
+    a = np.array([1, 2, 3], dtype=float)
+
+    print(f"{T.T @ (a - O) = }")
+    print(f"{(a - O) @ T = }")
+
+    a = np.array([[1, 2, 3], [1, 2, 3], [1, 2, 3]], dtype=float)
+
+    # print(f"{T @ (a - O) = }")
+    print(f"{(a - O) @ T = }")
+
+    a = np.array([[-2, 0, 3], [-2, 0, 3], [-2, 0, 3]], dtype=float)
+
+    print(f"{(a @ T.T) + O = }")
 
