@@ -1,6 +1,6 @@
 
 import typing
-from math import pi, sin, cos, tan, asin, acos, atan2
+from math import pi, sin, cos, tan, asin, acos, atan2, floor, ceil
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
@@ -24,7 +24,8 @@ def pad_with_zeros(*args, dtype=float) -> tuple[np.ndarray]:
 
 
 
-def distance(point1: list | np.ndarray, point2: list | np.ndarray) -> float:
+def distance(point1: list | np.ndarray,
+             point2: list | np.ndarray) -> float:
     """
     Returns the distance between two n-dimensional points.
     The shorter coordinate vector gets padded with zeros.
@@ -34,33 +35,42 @@ def distance(point1: list | np.ndarray, point2: list | np.ndarray) -> float:
 
 
 
-def angle2v(vector1: list | np.ndarray, vector2: list | np.ndarray, out: str = "radians") -> float:
+def angle2v(vector1: list | np.ndarray,
+            vector2: list | np.ndarray, out: str = "radians") -> float:
     """
     Returns the angle between two n-dimensional vectors.
     """
     v1, v2 = pad_with_zeros(vector1, vector2)
+    angle = acos(max(min(np.dot(v1, v2) /
+                         (np.linalg.norm(v1) * np.linalg.norm(v2)), 1), -1))
     if out == "degrees":
-        return degrees(acos(max(min(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)), 1), -1)))
+        return degrees(angle)
     else:
-        return acos(max(min(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)), 1), -1))
+        return angle
 
 
 
-def angle3p(point1: list | np.ndarray, point2: list | np.ndarray, point3: list | np.ndarray, out: str = "radians") -> float:
+def angle3p(point1: list | np.ndarray,
+            point2: list | np.ndarray,
+            point3: list | np.ndarray, out: str = "radians") -> float:
     """
-    Returns the angle between three n-dimensional points with the angle being at the 1st point.
+    Returns the angle between three n-dimensional points with the angle being
+    at the 1st point.
     """
     p1, p2, p3 = pad_with_zeros(point1, point2, point3)
     v1 = p2 - p1
     v2 = p3 - p1
+    angle = acos(max(min(np.dot(v1, v2) /
+                         (np.linalg.norm(v1) * np.linalg.norm(v2)), 1), -1))
     if out == "degrees":
-        return degrees(acos(max(min(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)), 1), -1)))
+        return degrees(angle)
     else:
-        return acos(max(min(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)), 1), -1))
+        return angle
 
 
 
-def normal2v(vector1: list | np.ndarray, vector2: list | np.ndarray, norm: bool = False) -> np.ndarray:
+def normal2v(vector1: list | np.ndarray,
+             vector2: list | np.ndarray, norm: bool = False) -> np.ndarray:
     """
     Returns a vector normal to the supplied vectors using right-hand rule.
     """
@@ -72,7 +82,9 @@ def normal2v(vector1: list | np.ndarray, vector2: list | np.ndarray, norm: bool 
 
 
 
-def normal3p(point1: list | np.ndarray, point2: list | np.ndarray, point3: list | np.ndarray, norm: bool = False) -> np.ndarray:
+def normal3p(point1: list | np.ndarray,
+             point2: list | np.ndarray,
+             point3: list | np.ndarray, norm: bool = False) -> np.ndarray:
     """
     Returns a vector normal to the plane defined by three points.
     """
@@ -96,7 +108,9 @@ def unit(vector: list | np.ndarray) -> np.ndarray:
 
 
 
-def project_point_to_line(P: list | np.ndarray, A: list | np.ndarray, B: list | np.ndarray) -> np.ndarray:
+def project_point_to_line(P: list | np.ndarray,
+                          A: list | np.ndarray,
+                          B: list | np.ndarray) -> np.ndarray:
     """
     Returns the projection of point P on a line defined by points A and B
 
@@ -208,6 +222,9 @@ def distance_line_to_line(A1: list | np.ndarray,
                           A2: list | np.ndarray,
                           B1: list | np.ndarray,
                           B2: list | np.ndarray) -> float:
+    """
+    returns the distance between the closest points on tho lines
+    """
     P1, P2 = closest_line_to_line(A1, A2, B1, B2)
     if P1 is None:    # parallel
         return distance_point_to_line(A1, B1, B2)
@@ -221,6 +238,26 @@ def reverse_cuthill_mckee(A: np.ndarray, reorder: bool = False):
     """
     Reverse Cuthill-McKee algorithm for reordering matrix for smallest
     badwidth
+
+    The square A matrix format is such that 1 at position (i, j)
+    means that node i is connected to variable j
+
+    A = [[1. 0. 0. 0. 1. 0. 0. 0.]
+         [0. 1. 1. 0. 0. 1. 0. 1.]
+         [0. 1. 1. 0. 1. 0. 0. 0.]
+         [0. 0. 0. 1. 0. 0. 1. 0.]
+         [1. 0. 1. 0. 1. 0. 0. 0.]
+         [0. 1. 0. 0. 0. 1. 0. 1.]
+         [0. 0. 0. 1. 0. 0. 1. 0.]
+         [0. 1. 0. 0. 0. 1. 0. 1.]]
+
+    To create the connectivity matrix above one can do:
+
+    >>> A = np.diag(np.ones(8))
+    >>> nzc = [[4], [2, 5, 7], [1, 4], [6], [0, 2], [1, 7], [3], [1, 5]]
+    >>> for i in range(len(nzc)):
+    >>>     for j in nzc[i]:
+    >>>         A[i, j] = 1
     """
 
     def getAdjacency(Mat: np.ndarray):
@@ -279,10 +316,14 @@ def reverse_cuthill_mckee(A: np.ndarray, reorder: bool = False):
     inl = []
 
     P = np.array(RCM_loop(degree, 0, adj, pivots, inl))
+
+    # permute the matrix A if needed
     if reorder:
         B = np.array(A)
+
         for i in range(B.shape[0]):
             B[:, i] = B[P, i]
+
         for i in range(B.shape[0]):
             B[i, :] = B[i, P]
         return P, B
@@ -291,8 +332,76 @@ def reverse_cuthill_mckee(A: np.ndarray, reorder: bool = False):
 
 
 
-def gramm_schmidt():
-    pass
+def show_matrix(A: list, title: list):
+    """
+    ncol = nrow + 2
+    nrow * (nrow + 2) = nplots
+    nplots = nrow^2 + 2 nrow
+    0 = nrow^2 + 2 nrow - nplots
+    nrow = (-2 +- (2 ^ 2 + 4 nplots) ** 0.5) / 2
+    nrow = ceil((-2 + (4 + 4 * nplots) ** 0.5) / 2)
+
+    Use:
+    >>> A = np.diag(np.ones(8))
+    >>> nzc = [[4], [2, 5, 7], [1, 4], [6], [0, 2], [1, 7], [3], [1, 5]]
+    >>> for i in range(len(nzc)):
+    >>>     for j in nzc[i]:
+    >>>         A[i, j] = 1
+    >>> P, B = reverse_cuthill_mckee(A, reorder=True)
+    >>> show_matrix([A, B], ["orig", "ordered"])
+    """
+    if type(A) is list:
+        nplots = len(A)
+        nrow = ceil((-2 + (4 + 4 * nplots) ** 0.5) / 2)
+        ncol = nplots / nrow
+        if ncol != ceil(ncol):
+            ncol = ceil(ncol)
+        nrow = int(nrow)
+        ncol = int(ncol)
+        fig, axs = plt.subplots(nrow, ncol, layout="tight")
+        if nrow == 1:
+            for n in range(nplots):
+                axs[n].spy(A[n])
+                axs[n].set_title(title[n])
+        else:
+            for i in range(nrow):
+                for j in range(ncol):
+                    if i * ncol + j >= nplots:
+                        axs[i][j].axis("off")
+                    else:
+                        axs[i][j].spy(A[i * ncol + j])
+                        axs[i][j].set_title(title[i * ncol + j])
+    else:
+        fig, ax = plt.subplots(1, 1)
+        ax.spy(A)
+        ax.set_title(title)
+
+    plt.show()
+
+
+
+def gramm_schmidt(A: np.ndarray) -> np.ndarray:
+    """
+    Performs Gramm-Schmidt orthonormalisation of the vector base, where
+    each column of matrix A is a separate vector that should be orthonormalised
+    to the ones with lower column numbers
+    """
+    (n, m) = A.shape
+
+    for i in range(m):
+        q = A[:, i] # i-th column of A
+
+        for j in range(i):
+            q = q - np.dot(A[:, j], A[:, i]) * A[:, j]
+
+        if np.array_equal(q, np.zeros(q.shape)):
+            raise np.linalg.LinAlgError("The column vectors are not linearly independent")
+
+        # normalize q
+        q = q / np.sqrt(np.dot(q, q))
+
+        # write the vector back in the matrix
+        A[:, i] = q
 
 
 
@@ -438,18 +547,56 @@ def mapping(source: np.ndarray, values: np.ndarray, target: np.ndarray,
 
 
 
+def interpolate_sin():
+    #              Hz :  mm/s2
+    amplitudes = { 10.:  5000.0,
+                   20.: 10000.0,
+                   30.:  3000.0,
+                   50.:  1000.0,
+                  100.:   100.0}
+    #         Hz :   s
+    sweep = { 10.:  30.,
+              15.:  60.,
+             100.: 600.}
+    # frequency
+    f = np.linspace(10., 100., 90)
+    a = np.interp(f, np.array(list(amplitudes.keys()), dtype=float),
+                     np.array(list(amplitudes.values()), dtype=float))
+    t = np.interp(f, np.array(list(sweep.keys()), dtype=float),
+                     np.array(list(sweep.values()), dtype=float))
+    p = a.copy()
+    p[:] = 0.
+    signal = np.array([complex(a[i], p[i]) for i in range(f.shape[0])])
+
+    print(f"{f = }")
+    print(f"{t = }")
+    print(f"{a = }")
+    print(f"{p = }")
+    print(f"{signal = }")
+
+    # plt.plot(f, a, label="original data")
+    # plt.legend()
+    # plt.show()
+
+    sampling_rate = f[-1] * 10.
+    dt = 1. / sampling_rate
+    tn = np.linspace(t[0], t[-1], int((t[-1] - t[0]) / dt) + 1)
+    fn = np.interp(tn, t, f)
+    print(f"{tn = }")
+
+    # TODO:
+    Iftdt = 1. / 2. * fn[0] * tn[0]
+    for tt in tn:
+        idx1 = np.where(t <= tt)[0][-1]
+        idx2 = np.where(t >= tt)[0][ 0]
+        # print(f"{tt = }, {idx1 = }, {idx2 = }")
+
+        s1 = signal[idx1].real * np.sin(2. * np.pi * Iftdt + signal[idx1].imag)
+
+
+
+
+
 if __name__ == "__main__":
-    A = np.diag(np.ones(8))
-    nzc = [[4], [2, 5, 7], [1, 4], [6], [0, 2], [1, 7], [3], [1, 5]]
+    interpolate_sin()
 
-    for i in range(len(nzc)):
-        for j in nzc[i]:
-            A[i, j] = 1
-
-    fig, axs = plt.subplots(1, 2)
-
-    P, B = reverse_cuthill_mckee(A, reorder=True)
-    axs[0].spy(A, color="black", marker="s")
-    axs[1].spy(B, color="red", marker="s")
-
-    plt.show()
