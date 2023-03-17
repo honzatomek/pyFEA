@@ -3,7 +3,11 @@ import typing
 from math import pi, sin, cos, tan, asin, acos, atan2, floor, ceil
 import numpy as np
 import scipy
+import scipy.signal
+import scipy.fft
 import matplotlib.pyplot as plt
+
+import pdb
 
 
 def pad_with_zeros(*args, dtype=float) -> tuple[np.ndarray]:
@@ -547,6 +551,56 @@ def mapping(source: np.ndarray, values: np.ndarray, target: np.ndarray,
 
 
 
+def sin_variable_frequency(times: np.ndarray, freqs: np.ndarray,
+                           signal: np.ndarray) -> np.ndarray:
+    """
+    Sine funciton with variable frequency
+
+    f(t) = A(t) * sin(2.0 π ∫f(t)dt + φ)
+    """
+    signal_t = []
+    for i, t in enumerate(times):
+        if i == 0:
+            Iftdt = freqs[i] * t
+        else:
+            Iftdt += (freqs[i-1] + freqs[i]) / 2.0 * (t - times[i-1])
+
+        if signal.dtype in (complex, np.complex,np.complex64, np.complex128, np.complex256):
+            s = signal[i].real * np.sin(2.0 * np.pi * Iftdt + signal[i].imag)
+        else:
+            s = signal[i] * np.sin(2.0 * np.pi * Iftdt)
+
+        if np.isnan(s):
+            raise ValueError(f"NaN value for {t = } {signal[i] = }")
+
+        signal_t.append(s)
+    return np.array(signal_t, dtype=float)
+
+
+
+def interpolate_sin(times_old: np.ndarray, freqs_old: np.ndarray,
+                    times_new: np.ndarray, freqs_new: np.ndarray,
+                    signal: np.ndarray):
+    shifted = False
+    if signal.dtype in (complex, np.complex,np.complex64, np.complex128, np.complex256):
+        amplitude_old = signal.real
+        phase_old = signal.imag
+        if np.min(phase_old) < 0.:
+            shifted = True
+            phase_old += np.pi
+    else:
+        amplitude_old = signal
+        phase_old = np.zeros(a.shape, dtype=float)
+
+    amplitude_new = np.interp(times_new, times_old, amplitude_old)
+    phase_new = np.interp(times_new, times_old, phase_old, period = 2.0 * np.pi)
+    if shifted:
+        phase_new -= np.pi
+
+    return np.array([complex(a, p) for a, p in zip(amplitude_new, phase_new)], dtype=complex)
+
+
+
 def interpolate_sin():
     #              Hz :  mm/s2
     amplitudes = { 10.:  5000.0,
@@ -595,8 +649,169 @@ def interpolate_sin():
 
 
 
+def PSD(times: np.ndarray, signal: np.ndarray,
+        plot: bool = False, show_immediately: bool = True) -> (np.ndarray, np.ndarray):
+    if times.shape[0] != signal.shape[0]:
+        raise ValueError(f"PSD: time vector and signal vector must have same " +
+                         f"length ({times.shape} != {signal.shape}")
+    N = signal.shape[0]                              # number of signal values
+    fs = 1.0 / (times[1] - times[0])                 # sampling frequency
+    fft  = np.fft.fftshift(np.fft.fft(signal))       # fast fourrier transform
+    freq = np.fft.fftshift(np.fft.fftfreq(N, 1./fs)) # frequencies with zero in the middle
+    fft  = fft[N // 2 + 1:]
+    freq = freq[N // 2 + 1:]
+    Pxx  = (1 / (fs * N)) * np.abs(fft) ** 2
+    Pxx *= 2.
+
+    if plot:
+        plt.plot(freq, Pxx, label="PSD")
+        plt.xlabel("Frequency [Hz]")
+        plt.ylabel("PSD [mm2/s4]")
+        plt.suptitle("PSD estimate using FFT")
+        if show_immediately:
+            plt.legend()
+            plt.show()
+
+    return freq, Pxx
+
+
+def PSD_scipy(times: np.ndarray, signal: np.ndarray,
+        plot: bool = False, show_immediately: bool = True) -> (np.ndarray, np.ndarray):
+    fs = 1.0 / (times[1] - times[0])                       # sampling frequency
+    freq, Pxx = scipy.signal.periodogram(signal, fs=fs, scaling="density")    # frequency, PSD
+
+    if plot:
+        plt.plot(freq, Pxx, label="PSD")
+        plt.xlabel("Frequency [Hz]")
+        plt.ylabel("PSD [mm2/s4]")
+        plt.suptitle("PSD estimate using FFT")
+        if show_immediately:
+            plt.legend()
+            plt.show()
+
+    return freq, Pxx
+
+
+
+def CSD(times: np.ndarray, signal1: np.ndarray, signal2: np.ndarray,
+        plot: bool = False, show_immediately: bool = True) -> (np.ndarray, np.ndarray):
+    N = signal1.shape[0]             # number of signal values
+    dt = times[1] - times[0]
+    fs = 1.0 / dt                    # sampling frequency
+    Cxy = np.fft.fft(signal1) * np.conjugate(np.fft.fft(signal2))
+    Cxy = np.fft.fftshift(Cxy)
+    Cxy = Cxy[N // 2 + 1:]
+    freq = np.fft.fftshift(np.fft.fftfreq(N, 1./fs)) # frequencies with zero in the middle
+    freq = freq[N // 2 + 1:]
+
+    Cxy = 1. / (N * fs) * abs(Cxy)
+
+    if plot:
+        plt.plot(freq, Cxy, label="Cross PSD")
+        plt.xlabel("Frequency [Hz]")
+        plt.ylabel("Cross PSD [mm2/s4]")
+        plt.suptitle("Cross Power Spectral Density")
+        if show_immediately:
+            plt.legend()
+            plt.show()
+
+    return freq, Cxy
+
+
+
+def Coherence(times: np.ndarray, signal1: np.ndarray, signal2: np.ndarray,
+              plot: bool = False, show_immediately: bool = True) -> (np.ndarray, np.ndarray):
+    N = signal1.shape[0]             # number of signal values
+    dt = times[1] - times[0]
+    fs = 1.0 / dt                    # sampling frequency
+
+    fft1 = np.fft.fft(signal1)
+    fft2 = np.fft.fft(signal2[::-1])
+
+    Cxy = np.abs(np.fft.fftshift(fft1 * np.conjugate(fft2))[N // 2 + 1:]) / (N * fs)
+    # Pxx = np.abs(np.fft.fftshift(fft1 * np.conjugate(fft1))[N // 2 + 1:]) / (N * fs)
+    # Pyy = np.abs(np.fft.fftshift(fft2 * np.conjugate(fft2))[N // 2 + 1:]) / (N * fs)
+    f1, Pxx = PSD(times, signal1)
+    f2, Pyy = PSD(times, signal2)
+
+    freq = np.fft.fftshift(np.fft.fftfreq(N, 1./fs)) # frequencies with zero in the middle
+    freq = freq[N // 2 + 1:]
+
+    coherence = Cxy ** 2 / (Pxx * Pyy)
+
+    if plot:
+        f2, c2 = scipy.signal.coherence(signal1, signal2, fs=fs)
+
+        f31, c31 = scipy.signal.csd(signal1, signal2, fs=fs)
+        f32, p32 = scipy.signal.csd(signal1, signal1, fs=fs)
+        f33, p33 = scipy.signal.csd(signal2, signal2, fs=fs)
+
+        c3 = np.abs(c31) ** 2 / (p32 * p33)
+
+        plt.plot(freq, coherence, label="manual")
+        plt.plot(f2, c2, label="scipy")
+        plt.plot(f31, c3, label="scipy 2")
+        plt.xlabel("Frequency [Hz]")
+        plt.ylabel("Coherence [-]")
+        plt.suptitle("Coherence")
+        if show_immediately:
+            plt.legend()
+            plt.show()
+
+    return freq, coherence
+
+def crossSpectrum(x, y, nperseg=1000):
+	# from: https://stackoverflow.com/questions/51258394/compute-coherence-in-python
+	#-------------------Remove mean-------------------
+	cross = numpy.zeros(nperseg, dtype='complex128')
+	for ind in range(x.size / nperseg):
+
+		xp = x[ind * nperseg: (ind + 1)*nperseg]
+		yp = y[ind * nperseg: (ind + 1)*nperseg]
+		xp = xp - numpy.mean(xp)
+		yp = yp - numpy.mean(xp)
+
+		# Do FFT
+		cfx = numpy.fft.fft(xp)
+		cfy = numpy.fft.fft(yp)
+
+		# Get cross spectrum
+		cross += cfx.conj()*cfy
+	freq=numpy.fft.fftfreq(nperseg)
+	return cross, freq
+
+
+
+def test_crossSpectrum():
+	# from: https://stackoverflow.com/questions/51258394/compute-coherence-in-python
+	x=numpy.linspace(-2500,2500,50000)
+	noise=numpy.random.random(len(x))
+	y=10*numpy.sin(2*numpy.pi*x)
+	y2=5*numpy.sin(2*numpy.pi*x)+5+noise*50
+
+	p11,freq=crossSpectrum(y,y)
+	p22,freq=crossSpectrum(y2,y2)
+	p12,freq=crossSpectrum(y,y2)
+
+	# coherence
+	coh=numpy.abs(p12)**2/p11.real/p22.real
+	plot(freq[freq > 0], coh[freq > 0])
+	xlabel('Normalized frequency')
+	ylabel('Coherence')
+
+
+
+def test():
+    # np.random.seed(19680801)
+    fs = 1000.
+    t = np.linspace(0., 1., int(fs) + 1)
+    x = np.cos(2. * np.pi * 100. * t) + np.random.randn(t.shape[0])
+    y = np.cos(2. * np.pi * 100. * t) + np.random.randn(t.shape[0])
+
+    f, c = Coherence(t, x, y, True, True)
+
 
 
 if __name__ == "__main__":
-    interpolate_sin()
+    test()
 
