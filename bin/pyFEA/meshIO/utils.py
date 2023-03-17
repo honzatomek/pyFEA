@@ -761,43 +761,44 @@ def Coherence(times: np.ndarray, signal1: np.ndarray, signal2: np.ndarray,
     return freq, coherence
 
 def crossSpectrum(x, y, nperseg=1000):
-	# from: https://stackoverflow.com/questions/51258394/compute-coherence-in-python
-	#-------------------Remove mean-------------------
-	cross = numpy.zeros(nperseg, dtype='complex128')
-	for ind in range(x.size / nperseg):
+    # from: https://stackoverflow.com/questions/51258394/compute-coherence-in-python
+    #-------------------Remove mean-------------------
+    cross = np.zeros(nperseg, dtype='complex128')
+    for ind in range(int(x.size / nperseg)):
 
-		xp = x[ind * nperseg: (ind + 1)*nperseg]
-		yp = y[ind * nperseg: (ind + 1)*nperseg]
-		xp = xp - numpy.mean(xp)
-		yp = yp - numpy.mean(xp)
+        xp = x[ind * nperseg: (ind + 1)*nperseg]
+        yp = y[ind * nperseg: (ind + 1)*nperseg]
+        xp = xp - np.mean(xp)
+        yp = yp - np.mean(xp)
 
-		# Do FFT
-		cfx = numpy.fft.fft(xp)
-		cfy = numpy.fft.fft(yp)
+        # Do FFT
+        cfx = np.fft.fft(xp)
+        cfy = np.fft.fft(yp)
 
-		# Get cross spectrum
-		cross += cfx.conj()*cfy
-	freq=numpy.fft.fftfreq(nperseg)
-	return cross, freq
+        # Get cross spectrum
+        cross += cfx.conj()*cfy
+    freq=np.fft.fftfreq(nperseg)
+    return cross, freq
 
 
 
 def test_crossSpectrum():
-	# from: https://stackoverflow.com/questions/51258394/compute-coherence-in-python
-	x=numpy.linspace(-2500,2500,50000)
-	noise=numpy.random.random(len(x))
-	y=10*numpy.sin(2*numpy.pi*x)
-	y2=5*numpy.sin(2*numpy.pi*x)+5+noise*50
+    # from: https://stackoverflow.com/questions/51258394/compute-coherence-in-python
+    x=np.linspace(-2500,2500,50000)
+    noise=np.random.random(len(x))
+    y=10*np.sin(2*np.pi*x)
+    y2=5*np.sin(2*np.pi*x)+5+noise*50
 
-	p11,freq=crossSpectrum(y,y)
-	p22,freq=crossSpectrum(y2,y2)
-	p12,freq=crossSpectrum(y,y2)
+    p11,freq=crossSpectrum(y,y)
+    p22,freq=crossSpectrum(y2,y2)
+    p12,freq=crossSpectrum(y,y2)
 
-	# coherence
-	coh=numpy.abs(p12)**2/p11.real/p22.real
-	plot(freq[freq > 0], coh[freq > 0])
-	xlabel('Normalized frequency')
-	ylabel('Coherence')
+    # coherence
+    coh=np.abs(p12)**2/p11.real/p22.real
+    plt.plot(freq[freq > 0], coh[freq > 0])
+    plt.xlabel('Normalized frequency')
+    plt.ylabel('Coherence')
+    plt.show()
 
 
 
@@ -813,5 +814,5 @@ def test():
 
 
 if __name__ == "__main__":
-    test()
+    test_crossSpectrum()
 
