@@ -163,7 +163,8 @@ def resample(time: np.ndarray, freq: np.ndarray,
 
 
 
-def butterworth_lowpass_filter(signal: np.ndarray, fs: float, cutoff: float, offset: int = 0) -> np.ndarray:
+def butterworth_lowpass_filter(signal: np.ndarray, fs: float, cutoff: float,
+                               offset: int = 0) -> np.ndarray:
     """
     Butterworth Lowpass filter
 
@@ -193,7 +194,8 @@ def butterworth_lowpass_filter(signal: np.ndarray, fs: float, cutoff: float, off
 
 
 
-def butterworth_highpass_filter(signal: np.ndarray, fs: float, cutoff: float, offset: int = 0) -> np.ndarray:
+def butterworth_highpass_filter(signal: np.ndarray, fs: float, cutoff: float,
+                                offset: int = 0) -> np.ndarray:
     """
     Butterworth Highpass filter
 

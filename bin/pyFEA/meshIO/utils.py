@@ -10,6 +10,15 @@ import matplotlib.pyplot as plt
 import pdb
 
 
+
+E = lambda msg, i = 0: " " * i + "[-] " + msg
+I = lambda msg, i = 0: " " * i + "[+] " + msg
+N = lambda msg, i = 6: " " * i + msg
+
+NEXT_POW2 = lambda x: int(1 if x == 0 else 2 ** (x - 1).bit_length())
+
+
+
 def pad_with_zeros(*args, dtype=float) -> tuple[np.ndarray]:
     """
     Pads the shorter vectors with zeros so that both have the same length
@@ -554,9 +563,16 @@ def mapping(source: np.ndarray, values: np.ndarray, target: np.ndarray,
 def sin_variable_frequency(times: np.ndarray, freqs: np.ndarray,
                            signal: np.ndarray) -> np.ndarray:
     """
-    Sine funciton with variable frequency
+    returns function values of sine cuve with varying frequency
 
-    f(t) = A(t) * sin(2.0 π ∫f(t)dt + φ)
+    f(s) = A(t) sin(2π ∫f(t) dt + φ(t))
+
+    where:
+        A(t) is amplitude at time t
+        f(t) is frequency at time t
+        φ(t) is phase at time t
+
+    Iftdt = ∫f(t) dt
     """
     signal_t = []
     for i, t in enumerate(times):
@@ -578,26 +594,119 @@ def sin_variable_frequency(times: np.ndarray, freqs: np.ndarray,
 
 
 
-def interpolate_sin(times_old: np.ndarray, freqs_old: np.ndarray,
-                    times_new: np.ndarray, freqs_new: np.ndarray,
-                    signal: np.ndarray):
+def resample(times_old: np.ndarray, freqs_old: np.ndarray,
+             times_new: np.ndarray, freqs_new: np.ndarray,
+             signal: np.ndarray) -> np.ndarray:
     shifted = False
     if signal.dtype in (complex, np.complex,np.complex64, np.complex128, np.complex256):
         amplitude_old = signal.real
-        phase_old = signal.imag
-        if np.min(phase_old) < 0.:
-            shifted = True
-            phase_old += np.pi
+        phase_old = np.degrees(signal.imag)
+
     else:
         amplitude_old = signal
         phase_old = np.zeros(a.shape, dtype=float)
 
     amplitude_new = np.interp(times_new, times_old, amplitude_old)
-    phase_new = np.interp(times_new, times_old, phase_old, period = 2.0 * np.pi)
-    if shifted:
-        phase_new -= np.pi
+    phase_new = np.radians(np.interp(times_new, times_old, phase_old, period = 360.))
 
     return np.array([complex(a, p) for a, p in zip(amplitude_new, phase_new)], dtype=complex)
+
+
+
+def butterworth_lowpass_filter(signal: np.ndarray, fs: float, cutoff: float,
+                               offset: int = 0) -> np.ndarray:
+    """
+    Butterworth Lowpass filter
+
+    sigal:  (np.ndarray) signal to filter
+    fs:     (float)sample rate [Hz]
+    cutoff: (float) desired cutoff frequency of the filter, slightly higher than the desired one
+    """
+
+    print(N(f"Applying Butterworth Low-Pass Filter", offset))
+    print(N(f"Frequency: {cutoff:.2f} Hz", offset + 2))
+
+    n = signal.shape[0]
+    T = n / fs
+    nyq = 0.5 * fs  # Nyquist frequency
+    order = 2       # quadratic sine wave representation
+
+    # normalise the frequency
+    normal_cutoff = cutoff / nyq
+
+    # get the filter coefficients
+    b, a     = scipy.signal.butter(N = order, Wn = normal_cutoff, btype = 'lowpass', analog = False)
+
+    # filter the signal
+    signal_f = scipy.signal.filtfilt(b, a, signal)
+
+    return signal_f
+
+
+
+def butterworth_highpass_filter(signal: np.ndarray, fs: float, cutoff: float,
+                                offset: int = 0) -> np.ndarray:
+    """
+    Butterworth Highpass filter
+
+    sigal:  (np.ndarray) signal to filter
+    fs:     (float)sample rate [Hz]
+    cutoff: (float) desired cutoff frequency of the filter, slightly lower than the desired one
+    """
+    print(N(f"Applying Butterworth High-Pass Filter", offset))
+    print(N(f"Frequency: {cutoff:.2f} Hz", offset + 2))
+
+    n = signal.shape[0]
+    T = n / fs
+    nyq = 0.5 * fs  # Nyquist frequency
+    order = 2       # quadratic sine wave representation
+
+    # normalise the frequency
+    normal_cutoff = cutoff / nyq
+
+    # get the filter coefficients
+    b, a     = scipy.signal.butter(N = order, Wn = normal_cutoff, btype = 'highpass', analog = False)
+
+    # filter the signal
+    signal_f = scipy.signal.filtfilt(b, a, signal)
+
+    return signal_f
+
+
+
+def butterworth_bandpass_filter(signal: np.ndarray, fs: float,
+                                lowcut: float, highcut: float, offset: int = 0) -> np.ndarray:
+    """
+    Butterworth Highpass filter
+
+    sigal:   (np.ndarray) signal to filter
+    fs:      (float)sample rate [Hz]
+    lowcut:  (float) desired cutoff frequency of the filter, slightly higher than the desired one
+    highcut: (float) desired cutoff frequency of the filter, slightly lower than the desired one
+    """
+
+    print(N(f"Applying Butterworth Band-Pass Filter", offset))
+    print(N(f"Low Frequency:  {lowcut:.2f} Hz", offset + 2))
+    print(N(f"High Frequency: {highcut:.2f} Hz", offset + 2))
+
+    n = signal.shape[0]
+    T = n / fs
+    nyq = 0.5 * fs  # Nyquist frequency
+    order = 2       # quadratic sine wave representation
+    # n = int(T * fs) # total number of samples
+
+    # normalise the frequencies
+    normal_lowcut = lowcut / nyq
+    normal_highcut = highcut / nyq
+
+    # get the filter coefficients
+    b, a     = scipy.signal.butter(N = order, Wn = [normal_lowcut, normal_highcut],
+                                   btype = 'bandpass', analog = False)
+
+    # filter the signal
+    signal_f = scipy.signal.filtfilt(b, a, signal)
+
+    return signal_f
 
 
 
