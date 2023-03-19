@@ -11,7 +11,9 @@ DATASET = lambda x: f"{x:>6n}\n"
 DATASETS = {  15: "NODE",
             2411: "NODE2P",
             2412: "ELEMENT",
-              55: "NODAL"}
+              55: "NODAL",
+              56: "ELEMENTAL",
+             773: "MATERIAL"}
 
 NODES = {  "NODE": "single",
          "NODE2P": "double"}
@@ -130,6 +132,89 @@ DATA_TYPE = {1: "Integer",
              4: "Real Double",
              5: "Complex",
              6: "Complex Double"}
+
+#               ID  [name, number of properties, max number of values, [material property IDs]]
+MATERIAL_TYPE = {0: ["NULL", 0, 0, []],
+                 1: ["ISOTROPIC", 29, 29, [1, 2, 3, 4, 5, 7, 8, 6, 9, 117, 10, 11, 12,
+                                           13, 14, 15, 16, 17, 18, 19, 20, 118, 119, 120,
+                                           121, 122, 123, 309, 310]],
+                 2: ["ORTHOTROPIC", 35, 35, [101, 102, 103, 104, 105, 106, 3, 108, 109,
+                                             110, 111, 112, 113, 7, 8, 114, 115, 116, 117,
+                                             11, 13, 14, 9, 15, 16, 118, 119, 120, 121,
+                                             122, 123, 124, 125, 309, 310]],
+                 3: ["ANISOTROPIC", 22, 22, [201, 202, 203, 204, 205, 206, 3, 208, 7, 8,
+                                             209, 9, 118, 119, 120, 121, 122, 123, 124, 125,
+                                             309, 310]],
+                 4: ["LAMINATE", 12, 12, [301, 302, 303, 304, 305, 306, 307, 3, 308, 309,
+                                          310, 311]]}
+
+#                     ID [value name, data type, number of values]
+MATERIAL_PROPERTY = {
+      1: ["E",      2, 1], # MODULUS OF ELASTICITY                      PRESSURE
+      2: ["NU",     2, 1], # POISSONS RATIO                             NO UNITS
+      3: ["DEN",    2, 1], # MASS DENSITY                               MASS DENSITY
+      4: ["G",      2, 1], # SHEAR MODULUS                              PRESSURE
+      5: ["A",      2, 1], # COEFFICIENT THERMAL EXPANSION              STRAIN/TEMPERATURE
+      6: ["K",      2, 1], # THERMAL CONDUCTIVITY                       CONDUCTIVITY
+      7: ["TREF",   2, 1], # THERMAL EXPANSION REFERENCE TEMPERATURE    TEMPERATURE
+      8: ["GE",     2, 1], # STRUCTURAL ELEMENT DAMPING COEFFICIENT     NO UNITS
+      9: ["CP",     2, 1], # SPECIFIC HEAT                              SPECIFIC HEAT
+     10: ["YS",     2, 1], # YIELD STRESS                               PRESSURE
+     11: ["CF",     2, 1], # CONVECTIVE FILM COEFFICIENT                CONVECTION COEFFICIE
+     12: ["TC",     2, 1], # THERMAL CAPACITY PER UNIT AREA             THERMAL CAPACITY
+     13: ["HF",     2, 1], # HEAT FLUX RATE                             HEAT FLUX / LENGTH
+     14: ["SHF",    2, 1], # SURFACE HEAT FLUX RATE                     HEAT FLUX / AREA
+     15: ["V",      2, 1], # VISCOSITY                                  FORCE*TIME/L**2
+     16: ["MU",     2, 1], # COEFFICIENT OF FRICTION                    NO UNITS
+     17: ["AF",     2, 1], # AREA FACTOR                                NO UNITS
+     18: ["EM",     2, 1], # EMISSIVITY                                 NO UNITS
+     19: ["AB",     2, 1], # ABSORPTIVITY                               NO UNITS
+     20: ["SC",     2, 1], # SWELLING COEFFICIENT                       NO UNITS
+    101: ["EX",     2, 1], # MODULUS OF ELASTICITY X                    PRESSURE
+    102: ["EY",     2, 1], # MODULUS OF ELASTICITY Y                    PRESSURE
+    103: ["EZ",     2, 1], # MODULUS OF ELASTICITY Z                    PRESSURE
+    104: ["NUXY",   2, 1], # POISSONS RATIO XY                          NO UNITS
+    105: ["NUYZ",   2, 1], # POISSONS RATIO YZ                          NO UNITS
+    106: ["NUXZ",   2, 1], # POISSONS RATIO XZ                          NO UNITS
+    108: ["GXY",    2, 1], # SHEAR MODULUS XY                           PRESSURE
+    109: ["GYZ",    2, 1], # SHEAR MODULUS YZ                           PRESSURE
+    110: ["GXZ",    2, 1], # SHEAR MODULUS XZ                           PRESSURE
+    111: ["AX",     2, 1], # COEFFICIENT THERMAL EXPANSION X            STRAIN/TEMPERATURE
+    112: ["AY",     2, 1], # COEFFICIENT THERMAL EXPANSION Y            STRAIN/TEMPERATURE
+    113: ["AZ",     2, 1], # COEFFICIENT THERMAL EXPANSION Z            STRAIN/TEMPERATURE
+    114: ["KX",     2, 1], # THERMAL CONDUCTIVITY X                     CONDUCTIVITY
+    115: ["KY",     2, 1], # THERMAL CONDUCTIVITY Y                     CONDUCTIVITY
+    116: ["KZ",     2, 1], # THERMAL CONDUCTIVITY Z                     CONDUCTIVITY
+    117: ["Q",      2, 1], # HEAT GENERATION RATE                       HEAT/VOLUME*TIME
+    118: ["XT",     2, 1], # ALLOWABLE STRESS IN TENSION IN X DIR       PRESSURE
+    119: ["XC",     2, 1], # ALLOWABLE STRESS IN COMPRESSION IN X DIR   PRESSURE
+    120: ["YT",     2, 1], # ALLOWABLE STRESS IN TENSION IN Y DIR       PRESSURE
+    121: ["YT",     2, 1], # ALLOWABLE STRESS IN COMPRESSION IN Y DIR   PRESSURE
+    122: ["S",      2, 1], # ALLOWABLE IN-PLANE SHEAR STRESS            PRESSURE
+    123: ["F12",    2, 1], # INTERACTION TERM FOR TSAI-WU               NO UNITS
+    124: ["SCX",    2, 1], # SWELLING COEFFICIENT IN X                  NO UNITS
+    125: ["SCY",    2, 1], # SWELLING COEFFICIENT IN Y                  NO UNITS
+    201: ["RW1",    2, 6], # ROW 1 MATERIAL PROPERTY MATRIX             PRESSURE
+    202: ["RW2",    2, 5], # ROW 2 MATERIAL PROPERTY MATRIX             PRESSURE
+    203: ["RW3",    2, 4], # ROW 3 MATERIAL PROPERTY MATRIX             PRESSURE
+    204: ["RW4",    2, 3], # ROW 4 MATERIAL PROPERTY MATRIX             PRESSURE
+    205: ["RW5",    2, 2], # ROW 5 MATERIAL PROPERTY MATRIX             PRESSURE
+    206: ["RW6",    2, 1], # ROW 6 MATERIAL PROPERTY MATRIX             PRESSURE
+    208: ["TEV",    2, 6], # THERMAL EXPANSION VECTOR                   STRAIN/TEMPERATURE
+    209: ["KKM",    2, 6], # THERMAL CONDUCTIVITY MATRIX                CONDUCTIVITY
+    301: ["AMTX",   2, 9], # MEMBRANE PROPERTIES (A MATRIX)             FORCE/LENGTH
+    302: ["BMTX",   2, 9], # COUPLED PROPERTIES (B MATRIX)              FORCE
+    303: ["DMTX",   2, 9], # BENDING PROPERTIES (D MATRIX)              TORQUE
+    304: ["SMTX",   2, 4], # TRANSVERSE SHEAR PROPERTIES (S MATRIX)     FORCE/LENGTH
+    305: ["EMTEC",  2, 3], # EFFECTIVE MEM THERMAL EXPANSION COEFF      STRAIN/TEMPERATURE
+    306: ["EMBEC",  2, 3], # EFFECTIVE MEM BENDING EXPANSION COEFF      STRAIN/TEMPERATURE
+    307: ["EBTEC",  2, 3], # EFFECTIVE BENDING THERMAL EXPANSION COEFF  STRAIN/TEMPERATURE
+    308: ["NONSTM", 2, 1], # NON STRUCTURAL MASS                        MASS/AREA
+    309: ["DMPCOF", 2, 1], # DAMPING COEFFICIENT                        NO UNITS
+    310: ["REFTMP", 2, 1], # REFERENCE TEMPERATURE                      TEMPERATURE
+    311: ["LAMTHK", 2, 1], # LAMINATE THICKNESS                         LENGTH
+}
+
 
 FORMAT = {"I": int,
           "E": float,
@@ -307,7 +392,7 @@ def _read_nodes_double(unv) -> dict:
 
 
 def _write_nodes_single(nodes: dict, comment: str = None) -> str:
-    print(f"[+] Writing nodes single precision).")
+    print(f"[+] Writing Nodes single precision.")
     if comment is not None:
         dataset = "\n".join([CHAR(c) for c in comment.split("\n")]) + "\n"
     else:
@@ -331,7 +416,7 @@ def _write_nodes_single(nodes: dict, comment: str = None) -> str:
 
 
 def _write_nodes_double(nodes: dict, comment: str = None) -> str:
-    print(f"[+] Writing nodes double precision).")
+    print(f"[+] Writing Nodes double precision.")
     if comment is not None:
         dataset = "\n".join([CHAR(c) for c in comment.split("\n")]) + "\n"
     else:
@@ -351,6 +436,16 @@ def _write_nodes_double(nodes: dict, comment: str = None) -> str:
             dataset += DOUBLE(coor)
         dataset += "\n"
     dataset += DELIMITER + "\n"
+    return dataset
+
+
+
+def _write_nodes(nodes: dict, precision: str = "double") -> str:
+    if precision == "single":
+        dataset = _write_nodes_single(nodes)
+    else:
+        dataset = _write_nodes_double(nodes)
+
     return dataset
 
 
@@ -404,7 +499,7 @@ def _read_elements(unv):
 
 
 def _write_elements(elements: dict, comment: str = None):
-    print(f"[+] Writing elements.")
+    print(f"[+] Writing Elements.")
     if comment is not None:
         dataset = "\n".join([CHAR(c) for c in comment.split("\n")]) + "\n"
     else:
@@ -457,6 +552,283 @@ def _write_elements(elements: dict, comment: str = None):
     dataset += DELIMITER + "\n"
 
     return dataset
+
+
+
+def _read_material(unv) -> dict:
+    print(f"[+] Reading Materials.")
+    materials = {}
+
+    lastPos, line = _read_line(unv) # DATASET number
+    dataset = int(line.strip())
+
+    # record 1
+    lastPos, line = _read_and_parse_line(unv, "3I10", dataset, 1)
+    if line == DELIMITER:
+        err = f"[-] Dataset {dataset:n} ended before finishing Material Table\n"
+        raise ReadError(err)
+
+    matID = line[0]
+    mat_desc = line[1]
+    numvaltypes = line[2]
+
+    material_desc = MATERIAL_TYPE[mat_desc]
+    mattype = material_desc[0]
+
+    # record 2
+    lastPos, line = _read_line(unv) # DATASET number
+    if line == DELIMITER:
+        err = f"[-] Dataset {dataset:n} ended before finishing Material Table {mat_table_ID:n}\n"
+        raise ReadError(err)
+
+    mat_name = str(line[:40].strip())
+
+    numvals = sum([MATERIAL_PROPERTY[p][2] for p in material_desc[3][:numvaltypes]])
+
+    vals = []
+    numlines = int(math.ceil(numvals / 6))
+    i = 0
+    while True:
+        i += 1
+        # record 3
+        lastPos, line = _read_and_parse_line(unv, "6E13.5", dataset, 3, i == numlines)
+        if line == DELIMITER:
+            break
+
+        vals += line
+
+        # TODO:
+        # discard at this moment, not sure what it is there for
+        # record 4
+        lastPos, line = _read_line(unv)
+        if line == DELIMITER:
+            err = f"[-] Dataset {dataset:n} ended before finishing Material Table {mat_table_ID:n}\n"
+            raise ReadError(err)
+
+    i = -1
+    material = {"name": mat_name, "type": mattype}
+    for p in material_desc[3][:numvaltypes]:
+        prop_name = MATERIAL_PROPERTY[p][0]
+        prop_count = MATERIAL_PROPERTY[p][2]
+
+        if prop_count == 1:
+            i += 1
+            property = vals[i]
+        else:
+            property = []
+            for j in range(prop_count):
+                i += 1
+                property.append(vals[i])
+        material.setdefault(prop_name, property)
+
+    materials.setdefault(matID, material)
+
+    return materials
+
+
+
+def _read_material2(unv) -> dict:
+    print(f"[+] Reading Materials.")
+    materials = {}
+
+    lastPos, line = _read_line(unv) # DATASET number
+    dataset = int(line.strip())
+
+    # record 1
+    lastPos, line = _read_and_parse_line(unv, "3I10", dataset, 1)
+    if line == DELIMITER:
+        err = f"[-] Dataset {dataset:n} ended before finishing Material Table\n"
+        raise ReadError(err)
+
+    matID = line[0]
+    mat_desc = line[1]
+    numvaltypes = line[2]
+
+    material_desc = MATERIAL_TYPE[mat_desc]
+    mattype = material_desc[0]
+
+    # record 2
+    lastPos, line = _read_line(unv) # DATASET number
+    if line == DELIMITER:
+        err = f"[-] Dataset {dataset:n} ended before finishing Material Table {mat_table_ID:n}\n"
+        raise ReadError(err)
+
+    mat_name = str(line[:40].strip())
+
+    numvals = sum([MATERIAL_PROPERTY[p][2] for p in material_desc[3][:numvaltypes]])
+
+    vals = []
+    numlines = int(math.ceil(numvals / 6))
+    l = 0
+    while True:
+        l += 1
+        # record 3
+        lastPos, line = _read_and_parse_line(unv, "6E13.5", dataset, 3, True)
+        if line == DELIMITER:
+            break
+
+        vals += line
+
+        # TODO:
+        # discard at this moment, not sure what it is there for
+        # record 4
+        lastPos, line = _read_line(unv)
+        if line == DELIMITER:
+            err = f"[-] Dataset {dataset:n} ended before finishing Material Table {mat_table_ID:n}\n"
+            raise ReadError(err)
+
+    i = -1
+    material = {"name": mat_name, "type": mattype}
+    for p in material_desc[3][:numvaltypes+1]:
+        prop_name = MATERIAL_PROPERTY[p][0]
+        prop_count = MATERIAL_PROPERTY[p][2]
+
+        if prop_count == 1:
+            i += 1
+            property = vals[i]
+        else:
+            property = []
+            for j in range(prop_count):
+                i += 1
+                property.append(vals[i])
+        material.setdefault(prop_name, property)
+
+    materials.setdefault(matID, material)
+
+    return materials
+
+
+
+def _write_material(matID, material: dict, comment: str = None) -> str:
+    print(f"[+] Writing Material {matID:n}.")
+    if comment is not None:
+        dataset = "\n".join([CHAR(c) for c in comment.split("\n")]) + "\n"
+    else:
+        dataset = ""
+
+    dataset += DELIMITER + "\n"
+
+    dataset += DATASET({v: k for k, v in DATASETS.items()}["MATERIAL"])
+
+    mattype = material["type"]
+    mattype = {v[0]: k for k, v in MATERIAL_TYPE.items()}[mattype]
+    matname = material["name"]
+
+    available_properties = list([MATERIAL_PROPERTY[p][0] for p in MATERIAL_TYPE[mattype][3]])
+    property_count = list([MATERIAL_PROPERTY[p][2] for p in MATERIAL_TYPE[mattype][3]])
+
+    supplied_properties = list([k for k in material.keys() if k not in ("type", "name")])
+
+    props = []
+    numprops = 0
+    for i in range(len(available_properties)):
+        if available_properties[i] not in supplied_properties:
+            if property_count[i] == 1:
+                props.append(0.)
+            else:
+                props.extend([0.] * property_count[i])
+            numprops += 1
+
+        else:
+            props.append(material[available_properties[i]])
+            numprops += 1
+            supplied_properties.remove(available_properties[i])
+            if len(supplied_properties) == 0:
+                break
+
+    dataset += INTEGER(matID)
+    dataset += INTEGER(mattype)
+    dataset += INTEGER(numprops)
+    dataset += "\n"
+
+    dataset += CHAR(matname[:40]) + "\n"
+
+    for i in range(len(props)):
+        dataset += SINGLE(props[i])
+        if (i + 1) % 6 == 0:
+            dataset += "\n" + INTEGER(0) + "\n"
+
+    if dataset[-1] != "\n":
+        dataset += "\n" + INTEGER(0) + "\n"
+
+    dataset += DELIMITER + "\n"
+
+    return dataset
+
+
+
+def _write_material2(matID: int, material: dict, comment: str = None) -> str:
+    print(f"[+] Writing Material {matID:n}.")
+    if comment is not None:
+        dataset = "\n".join([CHAR(c) for c in comment.split("\n")]) + "\n"
+    else:
+        dataset = ""
+
+    dataset += DELIMITER + "\n"
+
+    dataset += DATASET({v: k for k, v in DATASETS.items()}["MATERIAL"])
+
+    mattype = material["type"]
+    mattype = {v[0]: k for k, v in MATERIAL_TYPE.items()}[mattype]
+    matname = material["name"]
+
+    available_properties = list([MATERIAL_PROPERTY[p][0] for p in MATERIAL_TYPE[mattype][3]])
+    property_count = list([MATERIAL_PROPERTY[p][2] for p in MATERIAL_TYPE[mattype][3]])
+
+    properties = {k: v for k, v in material.items() if k not in ("type", "name")}
+    props = list(properties.keys())
+
+    for i in range(len(available_properties)):
+        if available_properties[i] not in props:
+            if property_count[i] == 1:
+                properties.setdefault(available_properties[i], [0.])
+            else:
+                properties.setdefault(available_properties[i], [0.] * property_count[i])
+        else:
+            if type(properties[available_properties[i]]) is not list:
+                properties[available_properties[i]] = [properties[available_properties[i]]]
+            props.remove(available_properties[i])
+            if len(props) == 0:
+                break
+
+    props = list([p for p in available_properties if p in properties])
+
+    numprops = len(properties.keys())
+
+    dataset += INTEGER(matID)
+    dataset += INTEGER(mattype)
+    dataset += INTEGER(numprops)
+    dataset += "\n"
+
+    dataset += CHAR(matname[:40]) + "\n"
+
+    for pname in props:
+        pvals = properties[pname]
+        nvals = len(pvals)
+        for i in range(len(pvals)):
+            dataset += SINGLE(pvals[i])
+            if (i + 1) % 6 == 0:
+                if i < 6:
+                    dataset += "\n" + INTEGER(nvals) + "  " + CHAR(pname)[:68] + "\n"
+                    nvals -= 6
+                else:
+                    dataset += "\n" + INTEGER(6) + "  " + CHAR(pname)[:68] + "\n"
+        if dataset[-1] != "\n":
+            dataset += "\n" + INTEGER(nvals) + "  " + CHAR(pname)[:68] + "\n"
+
+    dataset += DELIMITER + "\n"
+
+    return dataset
+
+
+
+def _write_materials(materials: dict) -> str:
+    datasets = ""
+
+    for matID, material in materials.items():
+        datasets += _write_material(matID, material)
+
+    return datasets
 
 
 
@@ -668,10 +1040,8 @@ def _read_nodal_data(unv) -> dict:
 
 
 
-# TODO:
-# change to the simplified results {load case ID: {load step ID: {results}}}
 def _write_nodal_data(lcID: int, lsID: int, result: dict, comment: str = None) -> str:
-    print(f"[+] Writing LCASE {lcID:n} LSTEP {lsID:n}.")
+    print(f"[+] Writing LCase {lcID:n} LStep {lsID:n} Nodal Data.")
     if comment is not None:
         dataset = "\n".join([CHAR(c) for c in comment.split("\n")]) + "\n"
     else:
@@ -713,28 +1083,35 @@ def _write_nodal_data(lcID: int, lsID: int, result: dict, comment: str = None) -
         first_val = result["values"][list(result["values"].keys())[0]][0]
         if type(first_val) in (int, np.int):
             dt = DATA_TYPE["Integer"]        # 1
-            FMT = INTEGER
-            numvals = 8
         elif type(first_val) in (float, np.float, np.float16, np.float32, np.float64):
             dt = DATA_TYPE["Real"]           # 2
-            FMT = SINGLE
-            numvals = 6
         elif type(first_val) is np.float128:
             dt = DATA_TYPE["Real Double"]    # 2
-            FMT = DOUBLE
-            numvals = 3
         elif type(first_val) in (complex, np.complex, np.complex128):
             dt = DATA_TYPE["Complex"]        # 5
-            FMT = SINGLE
-            numvals = 6
         elif type(first_val) is np.complex256:
             dt = DATA_TYPE["Complex Double"] # 6
-            FMT = DOUBLE
-            numvals = 3
         else: # default
             dt = DATA_TYPE["Real"]           # 2
-            FMT = SINGLE
-            numvals = 6
+
+    if dt == 1:
+        FMT = INTEGER
+        numvals = 8
+    elif dt == 2:
+        FMT = SINGLE
+        numvals = 6
+    elif dt == 3:
+        FMT = DOUBLE
+        numvals = 3
+    elif dt == 5:
+        FMT = SINGLE
+        numvals = 6
+    elif dt == 6:
+        FMT = DOUBLE
+        numvals = 3
+    else:
+        FMT = SINGLE
+        numvals = 6
 
     if "values per node" in result.keys():
         nvals = result["values per node"]
@@ -893,12 +1270,12 @@ def _write_data(nresults: dict = None, eresults: dict = None) -> str:
     datasets = ""
     if nresults is not None:
         for lcID in nresults.keys():
-            for lsID in nresults.keys():
+            for lsID in nresults[lcID].keys():
                 datasets += _write_nodal_data(lcID, lsID, nresults[lcID][lsID])
 
     if eresults is not None:
         for lcID in eresults.keys():
-            for lsID in eresults.keys():
+            for lsID in eresults[lcID].keys():
                 datasets += _write_elemental_data(lcID, lsID, eresults[lcID][lsID])
 
     return datasets
@@ -923,6 +1300,7 @@ def _read_dataset(unv) -> (dict, dict, dict, dict):
 
     nodes = None
     elements = None
+    materials = None
     nresults = None
     eresults = None
 
@@ -938,6 +1316,9 @@ def _read_dataset(unv) -> (dict, dict, dict, dict):
     elif dataset == "ELEMENT":
         elements = _read_elements(unv)
 
+    elif dataset == "MATERIAL":
+        materials = _read_material(unv)
+
     elif dataset == "NODAL":
         nresults = _read_nodal_data(unv)
 
@@ -947,11 +1328,11 @@ def _read_dataset(unv) -> (dict, dict, dict, dict):
     else:
         _read_dataset_till_end(unv, dataset_num)
 
-    return nodes, elements, nresults, eresults
+    return nodes, elements, materials, nresults, eresults
 
 
 
-def read(filename: str) -> (dict, dict, dict, dict):
+def read(filename: str) -> (dict, dict, dict, dict, dict):
     global _LINENUMBER
 
     print(f"[+] Reading {filename:s}:")
@@ -965,6 +1346,7 @@ def read(filename: str) -> (dict, dict, dict, dict):
 
     nodes = {}
     elements = {}
+    materials = {}
     nresults = {}
     eresults = {}
 
@@ -976,8 +1358,9 @@ def read(filename: str) -> (dict, dict, dict, dict):
             if line is None: # EOF
                 break
             elif line == DELIMITER:
-                _n, _e, _nr, _er = _read_dataset(unv)
-                for d, _d in zip([nodes, elements, nresults, eresults], [_n, _e, _nr, _er]):
+                _n, _e, _m, _nr, _er = _read_dataset(unv)
+                for d, _d in zip([nodes, elements, materials, nresults, eresults],
+                                 [_n, _e, _m, _nr, _er]):
                     if _d is not None:
                         d = _update_dict_of_dicts(d, _d)
 
@@ -991,12 +1374,12 @@ def read(filename: str) -> (dict, dict, dict, dict):
     if err:
         raise ReadError(f"[-] Errors found in file: {filename:s}")
 
-    return nodes, elements, nresults, eresults
+    return nodes, elements, materials, nresults, eresults
 
 
 
-def write(filename: str, nodes: dict, elements: dict=None, nresults: dict=None,
-          eresults: dict=None, precision="double"):
+def write(filename: str, nodes: dict, elements: dict=None, materials: dict=None,
+          nresults: dict=None, eresults: dict=None, precision="double"):
     print(f"[i] Writing {os.path.realpath(filename):s}")
 
     if os.path.isdir(os.path.dirname(os.path.realpath(filename))):
@@ -1009,6 +1392,10 @@ def write(filename: str, nodes: dict, elements: dict=None, nresults: dict=None,
         if elements is not None:
             datasets += _write_elements(elements)
 
+        if materials is not None:
+            # pdb.set_trace()
+            datasets += _write_materials(materials)
+
         if nresults is not None or eresults is not None:
             datasets += _write_data(nresults, eresults)
 
@@ -1018,8 +1405,32 @@ def write(filename: str, nodes: dict, elements: dict=None, nresults: dict=None,
         raise ValueError(f"[-] Directory for output ({os.path.dirname(os.path.realpath(filename)):s}) does not exist.")
 
 
+
 if __name__ == "__main__":
     unv_file = "./res/test_hex_double.unv"
-    nodes, elements, nresults, eresults = read(unv_file)
-    print_dict(nresults)
+    nodes, elements, materials, nresults, eresults = read(unv_file)
+
+
+    material_in = {"type": "ISOTROPIC",
+                   "name": "steel",
+                   "E": 210000.,
+                   "NU": 0.3,
+                   "DEN": 7.85E-9,
+                   "A": 1.2E-6,
+                   "G": 80769.,
+                   "TREF": 20.,
+                   "YS": 210.,
+                   "MU": 0.2,
+                   "DMPCOF": 0.005,
+                   "REFTMP": 20.}
+    materials = {1: material_in}
+
+    write("./res/test_hex_double_material.unv", nodes, elements, materials, nresults, eresults)
+    nodes, elements, materials, nresults, eresults = read("./res/test_hex_double_material.unv")
+
+    material_out = materials[1]
+
+    for key, value in material_in.items():
+        assert value == material_out[key]
+
 
