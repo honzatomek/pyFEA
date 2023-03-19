@@ -13,7 +13,8 @@ DATASETS = {  15: "NODE",
             2412: "ELEMENT",
               55: "NODAL",
               56: "ELEMENTAL",
-             773: "MATERIAL"}
+             773: "MATERIAL",
+              18: "CSYS"}
 
 NODES = {  "NODE": "single",
          "NODE2P": "double"}
@@ -215,6 +216,19 @@ MATERIAL_PROPERTY = {
     311: ["LAMTHK", 2, 1], # LAMINATE THICKNESS                         LENGTH
 }
 
+CSYS_TYPE = {0: "Cartesian",
+             1: "Cylindrical",
+             2: "Spherical"}
+
+# not in UNV specification !!!
+# CSYS_DEFINITION = {0: "xy",
+#                    1: "yx",
+#                    2: "xz",
+#                    3: "zx",
+#                    4: "yz",
+#                    5: "zy"}
+CSYS =_DEFINITION = {1: "xz"} # origin, +x axis, +xz plane
+
 
 FORMAT = {"I": int,
           "E": float,
@@ -334,6 +348,89 @@ def _read_and_parse_line(unv, format: str, dataset: int, record: int,
         position += f[0]
 
     return lastPos, fields
+
+
+
+def _read_csys(unv) -> dict:
+    print(f"[+] Reading Coordinate Systems.")
+
+    lastPos, line = _read_line(unv) # DATASET number
+    dataset = int(line.strip())
+
+    err = ""
+    csys = {}
+    while True:
+        lastPos, line = _read_and_parse_line(unv, "5I10", dataset, 1)
+        if line == DELIMITER:  # end of DATASET
+            break
+
+        cid = line[0]
+        ctype = CSYS_TYPE[line[1]]
+        cref = line[2]
+        color = line[3]
+        # cdef = line[4]
+
+        lastPos, line = _read_line(unv,
+            msg_eof = f"[-] File ended before closing the dataset {dataset:n}\n")
+        if line == DELIMITER:  # end of DATASET
+            err = f"[-] Dataset {dataset:n} ended before finishing CSys {cid:n}\n"
+            raise ReadError(err)
+
+        cname = line[:40].strip()
+
+        lastPos, line = _read_and_parse_line(unv, "6E13.5", dataset, 1)
+        if line == DELIMITER:  # end of DATASET
+            err = f"[-] Dataset {dataset:n} ended before finishing CSys {cid:n}\n"
+            raise ReadError(err)
+
+        origin = line[:3]
+        xaxis = line[3:]
+
+        lastPos, line = _read_and_parse_line(unv, "3E13.5", dataset, 1)
+        if line == DELIMITER:  # end of DATASET
+            err = f"[-] Dataset {dataset:n} ended before finishing CSys {cid:n}\n"
+            raise ReadError(err)
+
+        xzplane = line
+
+        csys.setdefault(cid, {"type": ctype, "ref": cref, "origin": origin,
+                              "xaxis": xaxis, "xzplane": xzplane})
+
+    return csys
+
+
+
+def _write_csys(csys: dict, comment: str = None) -> str:
+    print(f"[+] Writing Coordinate Systems.")
+    if comment is not None:
+        dataset = "\n".join([CHAR(c) for c in comment.split("\n")]) + "\n"
+    else:
+        dataset = ""
+
+    dataset += DELIMITER + "\n"
+
+    dataset += DATASET({v: k for k, v in DATASETS.items()}["CSYS"])
+
+    for cid, cs in csys.items():
+        ctype = int({v: k for k, v in CSYS_TYPE.items()}[cs["type"]])
+        cref = cs["ref"] if "ref" in cs.keys() else 0
+        color = cs["color"] if "color" in cs.keys() else 1
+        cdef = CSYS_DEFINITION["xz"]
+        origin = cs["origin"]
+        xaxis = cs["xaxis"]
+        xzplane = cs["xzplane"]
+
+        dataset += INTEGER(cid)
+        dataset += INTEGER(cref)
+        dataset += INTEGER(color)
+        dataset += INTEGER(cdef) + "\n"
+
+        dataset += SINGLE(origin) + SINGLE(xaxis) + "\n"
+        dataset += SINGLE(xzplane) + "\n"
+
+    dataset += DELIMITER + "\n"
+
+    return dataset
 
 
 
@@ -1268,12 +1365,12 @@ def _write_nodal_data(lcID: int, lsID: int, result: dict, comment: str = None) -
 # rewrite for simplified results model
 def _write_data(nresults: dict = None, eresults: dict = None) -> str:
     datasets = ""
-    if nresults is not None:
+    if nresults is not None and len(nresults.keys()):
         for lcID in nresults.keys():
             for lsID in nresults[lcID].keys():
                 datasets += _write_nodal_data(lcID, lsID, nresults[lcID][lsID])
 
-    if eresults is not None:
+    if eresults is not None and len(eresults.keys()):
         for lcID in eresults.keys():
             for lsID in eresults[lcID].keys():
                 datasets += _write_elemental_data(lcID, lsID, eresults[lcID][lsID])
@@ -1300,6 +1397,7 @@ def _read_dataset(unv) -> (dict, dict, dict, dict):
 
     nodes = None
     elements = None
+    csys = None
     materials = None
     nresults = None
     eresults = None
@@ -1316,6 +1414,9 @@ def _read_dataset(unv) -> (dict, dict, dict, dict):
     elif dataset == "ELEMENT":
         elements = _read_elements(unv)
 
+    elif dataset == "CSYS":
+        csys = _read_csys(unv)
+
     elif dataset == "MATERIAL":
         materials = _read_material(unv)
 
@@ -1328,7 +1429,7 @@ def _read_dataset(unv) -> (dict, dict, dict, dict):
     else:
         _read_dataset_till_end(unv, dataset_num)
 
-    return nodes, elements, materials, nresults, eresults
+    return nodes, elements, csys, materials, nresults, eresults
 
 
 
@@ -1346,6 +1447,7 @@ def read(filename: str) -> (dict, dict, dict, dict, dict):
 
     nodes = {}
     elements = {}
+    csys = {}
     materials = {}
     nresults = {}
     eresults = {}
@@ -1358,9 +1460,9 @@ def read(filename: str) -> (dict, dict, dict, dict, dict):
             if line is None: # EOF
                 break
             elif line == DELIMITER:
-                _n, _e, _m, _nr, _er = _read_dataset(unv)
-                for d, _d in zip([nodes, elements, materials, nresults, eresults],
-                                 [_n, _e, _m, _nr, _er]):
+                _n, _e, _cs, _m, _nr, _er = _read_dataset(unv)
+                for d, _d in zip([nodes, elements, csys, materials, nresults, eresults],
+                                 [_n, _e, _cs, _m, _nr, _er]):
                     if _d is not None:
                         d = _update_dict_of_dicts(d, _d)
 
@@ -1374,26 +1476,29 @@ def read(filename: str) -> (dict, dict, dict, dict, dict):
     if err:
         raise ReadError(f"[-] Errors found in file: {filename:s}")
 
-    return nodes, elements, materials, nresults, eresults
+    return nodes, elements, csys, materials, nresults, eresults
 
 
 
-def write(filename: str, nodes: dict, elements: dict=None, materials: dict=None,
-          nresults: dict=None, eresults: dict=None, precision="double"):
+def write(filename: str, nodes: dict, elements: dict=None, csys: dict=None,
+          materials: dict=None, nresults: dict=None, eresults: dict=None,
+          precision="double"):
     print(f"[i] Writing {os.path.realpath(filename):s}")
 
     if os.path.isdir(os.path.dirname(os.path.realpath(filename))):
 
         datasets = ""
 
-        if nodes is not None:
+        if nodes is not None and len(nodes.keys()) != 0:
             datasets += _write_nodes(nodes, precision)
 
-        if elements is not None:
+        if elements is not None and len(elements.keys()) != 0:
             datasets += _write_elements(elements)
 
-        if materials is not None:
-            # pdb.set_trace()
+        if csys is not None and len(csys.keys()) != 0:
+            datasets += _write_csys(csys)
+
+        if materials is not None and len(materials.keys()) != 0:
             datasets += _write_materials(materials)
 
         if nresults is not None or eresults is not None:
@@ -1408,7 +1513,7 @@ def write(filename: str, nodes: dict, elements: dict=None, materials: dict=None,
 
 if __name__ == "__main__":
     unv_file = "./res/test_hex_double.unv"
-    nodes, elements, materials, nresults, eresults = read(unv_file)
+    nodes, elements, csys, materials, nresults, eresults = read(unv_file)
 
 
     material_in = {"type": "ISOTROPIC",
@@ -1425,8 +1530,12 @@ if __name__ == "__main__":
                    "REFTMP": 20.}
     materials = {1: material_in}
 
-    write("./res/test_hex_double_material.unv", nodes, elements, materials, nresults, eresults)
-    nodes, elements, materials, nresults, eresults = read("./res/test_hex_double_material.unv")
+    unv_file_2 = "./res/test_hex_double_material.unv"
+
+    write(unv_file_2, nodes, elements, csys, materials,
+          nresults, eresults)
+
+    nodes, elements, csys, materials, nresults, eresults = read(unv_file_2)
 
     material_out = materials[1]
 

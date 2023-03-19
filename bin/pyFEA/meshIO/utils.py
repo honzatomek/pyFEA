@@ -953,7 +953,11 @@ class SpectrumWindow():
     def Exponential(cls, M: int, decay: float) -> np.ndarray:
         w = np.linspace(0., M - 1, M)
         center = float((M - 1) / 2)
-        w = np.e ** (-np.abs(w - center) / decay)
+        # w = np.e ** (-np.abs(w - center) / (decay * (M - 1) / 10))
+        print(f"{decay = }")
+        d = decay / (M - 1)
+        print(f"{d = }")
+        w = np.e ** (-np.abs(w - center) / d)
         # w /= np.max(w)
         return w
 
@@ -987,7 +991,7 @@ class SpectrumWindow():
         x = np.linspace(0., xmax, M)
 
         w = cls.Box(M)
-        # plt.plot(x, w, label="Box")
+        plt.plot(x, w, label="Box")
         # w = cls.Bartlett(M)
         # plt.plot(x, w, label="Bartlett")
         # w = cls.BartlettHann(M)
@@ -996,14 +1000,14 @@ class SpectrumWindow():
         # plt.plot(x, w, label="Blackman")
         # w = cls.Cosine(M)
         # plt.plot(x, w, label="Cosine")
-        w = cls.Exponential(M, 3.0)
+        w = cls.Exponential(M, 1.0)
         plt.plot(x, w, label="Exponential")
-        w = cls.Gauss(M, 7.)
+        # w = cls.Gauss(M, 7.)
         # plt.plot(x, w, label="Gauss")
-        # w = cls.Hann(M)
+        w = cls.Hann(M)
         plt.plot(x, w, label="Hann")
         w = cls.Hamming(M)
-        # plt.plot(x, w, label="Hamming")
+        plt.plot(x, w, label="Hamming")
         # w = cls.Lanczos(M)
         # plt.plot(x, w, label="Lanczos")
         plt.legend()
@@ -1024,5 +1028,5 @@ def test():
 
 if __name__ == "__main__":
     # test_crossSpectrum()
-    SpectrumWindow.plot_all(51, 100.)
+    SpectrumWindow.plot_all(101, 1.)
 
