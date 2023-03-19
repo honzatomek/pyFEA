@@ -1002,19 +1002,22 @@ def read_nodal_results(unv):
     if analysis_type == 0: # analysis type = Unknown
         result["id"] = ints[0]
         id = result["id"]
+        step = 1
 
         result["value"] = float[0]
 
     elif analysis_type == 1: # analysis type = Static
         result["lcase"] = ints[0]
         id = result["lcase"]
+        step = 0
 
         result["value"] = floats[0]
 
     elif analysis_type == 2: # analysis type = normal mode
-        result["id"] = ints[0]
-        result["mode"] = ints[1]
-        id = result["id"]
+        id = ints[0]
+        step = ints[1]
+        result["id"] = id
+        result["mode"] = step
 
         result["frequency"] = floats[0]
         result["modal mass"] = floats[1]
@@ -1022,31 +1025,35 @@ def read_nodal_results(unv):
         result["modal hysteric damping ratio"] = floats[3]
 
     elif analysis_type == 3: # analysis type = complex eigenvalue
-        result["lcase"] = ints[0]
-        result["mode"] = ints[1]
-        id = result["mode"]
+        id = ints[0]
+        step = ints[1]
+        result["lcase"] = id
+        result["mode"] = step
 
         result["eigenvalue"] = complex(floats[0], floats[1])
         result["modal A"] = complex(floats[2], floats[3])
         result["modal B"] = complex(float[4], floats[5])
 
     elif analysis_type == 4: # analysis type = transient
-        result["lcase"] = ints[0]
-        result["time step"] = ints[1]
-        id = result["time step"]
+        id = ints[0]
+        step = ints[1]
+        result["lcase"] = id
+        result["time step"] = step
 
         result["time"] = floats[0]
 
     elif analysis_type == 5: # analysis type = frequency response
-        result["lcase"] = ints[0]
-        result["frequency step number"] = ints[1]
-        id = result["frequency step number"]
+        id = ints[0]
+        step = ints[1]
+        result["lcase"] = id
+        result["frequency step number"] = step
 
         result["frequency"] = floats[0]
 
     elif analysis_type == 6: # analysis type = buckling
-        result["lcase"] = ints[0]
-        id = result["lcase"]
+        id = ints[0]
+        step = 1
+        result["lcase"] = id
 
         result["eigenvalue"] = floats[0]
 
@@ -1055,6 +1062,7 @@ def read_nodal_results(unv):
         result["num of realvals"] = numfloats
         result["specific integer parameters"] = ints
         id = ints[0]
+        step = 1
 
         result["specific real parameters"] = floats
 
@@ -1085,11 +1093,15 @@ def read_nodal_results(unv):
         else:
             nodes[nid] = [complex(vals[i], vals[i+1]) for i in range(0, len(vals), 2)]
 
+    result.setdefault("values", nodes)
+
     results = dict()
-    results.setdefault(result["model type"], dict())
-    results[result["model type"]].setdefault(result["analysis type"], dict())
-    results[result["model type"]][result["analysis type"]].setdefault("NODAL", dict())
-    results[result["model type"]][result["analysis type"]]["NODAL"][id] = nodes
+    # results.setdefault(result["model type"], dict())
+    # results[result["model type"]].setdefault(result["analysis type"], dict())
+    # results[result["model type"]][result["analysis type"]].setdefault("NODAL", dict())
+    # results[result["model type"]][result["analysis type"]]["NODAL"][id] = nodes
+    results.setdefault(id, dict())
+    results[id].setdefault(step, result)
 
     return results
 
@@ -1100,7 +1112,7 @@ def read_elemental_results(unv) -> dict:
 
 
 
-def read_dataset(unv) -> (dict, dict, dict):
+def read_dataset(unv) -> (dict, dict, dict, dict):
     global _LINENUMBER
 
     lastPos, line = read_line(unv)
@@ -1113,7 +1125,8 @@ def read_dataset(unv) -> (dict, dict, dict):
 
     nodes = None
     elements = None
-    results = None
+    nresults = None
+    eresults = None
 
     unv.seek(lastPos)
     _LINENUMBER -= 1
@@ -1128,19 +1141,19 @@ def read_dataset(unv) -> (dict, dict, dict):
         elements = read_elements(unv)
 
     elif dataset == "NODAL":
-        results = read_nodal_results(unv)
+        nresults = read_nodal_results(unv)
 
     elif dataset == "ELEMENTAL":
-        results = read_elemental_results(unv)
+        eresults = read_elemental_results(unv)
 
     else:
         read_dataset_till_end(unv, dataset_num)
 
-    return nodes, elements, results
+    return nodes, elements, nresults, eresults
 
 
 
-def read(filename: str) -> (dict, dict, dict):
+def read(filename: str) -> (dict, dict, dict, dict):
     global _LINENUMBER
 
     print(f"[+] Reading {filename:s}:")
@@ -1154,7 +1167,8 @@ def read(filename: str) -> (dict, dict, dict):
 
     nodes = {}
     elements = {}
-    results = {}
+    nresults = {}
+    eresults = {}
 
     lineNo = 0
     err = False
@@ -1164,8 +1178,8 @@ def read(filename: str) -> (dict, dict, dict):
             if line is None: # EOF
                 break
             elif line == DELIMITER:
-                _n, _e, _r = read_dataset(unv)
-                for d, _d in zip([nodes, elements, results], [_n, _e, _r]):
+                _n, _e, _nr, _er = read_dataset(unv)
+                for d, _d in zip([nodes, elements, nresults, eresults], [_n, _e, _nr, _er]):
                     if _d is not None:
                         d = update_dict_of_dicts(d, _d)
 
@@ -1179,7 +1193,7 @@ def read(filename: str) -> (dict, dict, dict):
     if err:
         raise ReadError(f"[-] Errors found in file: {filename:s}")
 
-    return nodes, elements, results
+    return nodes, elements, nresults, eresults
 
 
 
@@ -1203,5 +1217,6 @@ def write(filename: str, nodes: dict, elements: dict=None, results: dict=None,
 
 if __name__ == "__main__":
     unv_file = "./res/test_hex_double.unv"
-    read(unv_file)
+    nodes, elements, nresults, eresults = read(unv_file)
+    print(nresults)
 
