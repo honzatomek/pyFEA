@@ -6,7 +6,7 @@ import math
 import pdb
 
 DELIMITER = f"{-1:6n}"
-DATASET = "{0:>6n}\n"
+DATASET = lambda x: f"{x:>6n}\n"
 
 DATASETS = {  15: "NODE",
             2411: "NODE2P",
@@ -135,12 +135,28 @@ FORMAT = {"I": int,
           "E": float,
           "D": float,
           "A": str}
+INTEGER = lambda x: f"{x:10n}"
+SINGLE = lambda x: f"{x:13.5E}"
+DOUBLE = lambda x: f"{x:25.16E}".replace("E", "D")
+# CSINGLE = lambda x: f"{x.real:13.5E}{x.imag:13.5E}"
+# CDOUBLE = lambda x: f"{x.real:25.16E}{x.imag:25.16E}".replace("E", "D")
+CHAR = lambda x: f"{x[:80]:80s}".rstrip(" ") if x != "" else "NONE"
 
 _LINENUMBER = 0
 
 
 class ReadError(Exception):
     pass
+
+
+
+def print_dict(dictionary: dict, offset: int = 0):
+    for key, items in dictionary.items():
+        if type(items) is dict:
+            print("  " * offset + str(key))
+            print_dict(items, offset + 1)
+        else:
+            print("  " * (offset + 1) + str(key) + ": " + str(items))
 
 
 
@@ -290,28 +306,50 @@ def _read_nodes_double(unv) -> dict:
 
 
 
-def _write_nodes(nodes: dict, precision: str = "single", comment: str = None) -> str:
-    print(f"[+] Writing nodes ({precision:s} precision).")
+def _write_nodes_single(nodes: dict, comment: str = None) -> str:
+    print(f"[+] Writing nodes single precision).")
     if comment is not None:
-        dataset = comment + "\n"
+        dataset = "\n".join([CHAR(c) for c in comment.split("\n")]) + "\n"
     else:
         dataset = ""
     dataset += DELIMITER + "\n"
-    if precision == "double":
-        dataset += DATASET.format({v: k for k, v in DATASETS.items()}["NODE2P"])
-        # dataset += DATASET.format(781)
-    else: # single precision
-        dataset += DATASET.format({v: k for k, v in DATASETS.items()}["NODE"])
-        # dataset += DATASET.format(15)
-    defsys = 1
-    outsys = 1
+    dataset += DATASET({v: k for k, v in DATASETS.items()}["NODE"])
     color = 1
-    for nid, coor in nodes.items():
-        dataset += f"{nid:10n}{defsys:10n}{outsys:10n}{color:10n}"
-        if precision == "double":
-            dataset += f"\n{coor[0]:25.16E}{coor[1]:25.16E}{coor[2]:25.16E}\n".replace("E", "D")
-        else:
-            dataset += f"{coor[0]:13.5E}{coor[1]:13.5E}{coor[2]:13.5E}\n"
+    for nid, node in nodes.items():
+        defsys = 1 if "def" not in node.keys() else node["def"]
+        outsys = 1 if "out" not in node.keys() else node["out"]
+        dataset += INTEGER(nid)
+        dataset += INTEGER(defsys)
+        dataset += INTEGER(outsys)
+        dataset += INTEGER(color)
+        for coor in node["coors"]:
+            dataset += SINGLE(coor)
+        dataset += "\n"
+    dataset += DELIMITER + "\n"
+    return dataset
+
+
+
+def _write_nodes_double(nodes: dict, comment: str = None) -> str:
+    print(f"[+] Writing nodes double precision).")
+    if comment is not None:
+        dataset = "\n".join([CHAR(c) for c in comment.split("\n")]) + "\n"
+    else:
+        dataset = ""
+    dataset += DELIMITER + "\n"
+    dataset += DATASET({v: k for k, v in DATASETS.items()}["NODE2P"])
+    color = 1
+    for nid, node in nodes.items():
+        defsys = 1 if "def" not in node.keys() else node["def"]
+        outsys = 1 if "out" not in node.keys() else node["out"]
+        dataset += INTEGER(nid)
+        dataset += INTEGER(defsys)
+        dataset += INTEGER(outsys)
+        dataset += INTEGER(color)
+        dataset += "\n"
+        for coor in node["coors"]:
+            dataset += DOUBLE(coor)
+        dataset += "\n"
     dataset += DELIMITER + "\n"
     return dataset
 
@@ -357,8 +395,8 @@ def _read_elements(unv):
         if etype not in elements.keys():
             elements.setdefault(etype, {})
 
-        elements[etype][eid] = {"material": mid,
-                                "property": pid,
+        elements[etype][eid] = {"mid": mid,
+                                "pid": pid,
                                 "nodes": nid}
 
     return elements
@@ -368,44 +406,46 @@ def _read_elements(unv):
 def _write_elements(elements: dict, comment: str = None):
     print(f"[+] Writing elements.")
     if comment is not None:
-        dataset = comment + "\n"
+        dataset = "\n".join([CHAR(c) for c in comment.split("\n")]) + "\n"
     else:
         dataset = ""
+
     dataset += DELIMITER + "\n"
 
-    dataset += DATASET.format({v: k for k, v in DATASETS.items()}["ELEMENT"])
+    dataset += DATASET({v: k for k, v in DATASETS.items()}["ELEMENT"])
 
     ELEMENT_KEYS = {v: k for k, v in ELEMENTS.items()}
 
-    pid = 1
-    mid = 1
     color = 1
 
     for etype, els in elements.items():
         for eid in els.keys():
-            # TODO:
-            if "property" in els[eid].keys():
-                pid = els[eid]["property"]
-            else:
-                pid = 1
-            if "material" in els[eid].keys():
-                mid = els[eid]["material"]
-            else:
-                mid = 1
+            pid = 1 if "pid" not in els[eid].keys() else els[eid]["pid"]
+            mid = 1 if "mid" not in els[eid].keys() else els[eid]["mid"]
             nodes = els[eid]["nodes"]
             numnodes = len(nodes)
-            dataset += f"{eid:10n}{ELEMENT_KEYS[etype]:10n}{pid:10n}{mid:10n}{color:10n}{numnodes:10n}\n"
+            dataset += INTEGER(eid)
+            dataset += INTEGER(ELEMENT_KEYS[etype])
+            dataset += INTEGER(pid)
+            dataset += INTEGER(mid)
+            dataset += INTEGER(color)
+            dataset += INTEGER(numnodes)
+            dataset += "\n"
 
+            # TODO:
             # beam elements
             if ELEMENT_KEYS[etype] in [21, 22, 24]:
                 orinode = 0
                 endAid = 0
                 endBis = 0
-                dataset += f"{orinode:10n}{endAid:10n}{endBid:10n}\n"
+                dataset += INTEGER(orinode)
+                dataset += INTEGER(endAid)
+                dataset += INTEGER(endBid)
+                dataset += "\n"
 
             # nodes
             for i in range(numnodes):
-                dataset += f"{nodes[i]:10n}"
+                dataset += INTEGER(nodes[i])
                 if (i + 1) % 8 == 0:
                     dataset += "\n"
             if dataset.endswith("\n"):
@@ -413,7 +453,6 @@ def _write_elements(elements: dict, comment: str = None):
                     dataset = dataset[:-1]
             else:
                 dataset += "\n"
-
 
     dataset += DELIMITER + "\n"
 
@@ -504,6 +543,8 @@ def _read_nodal_data(unv) -> dict:
         err += f"    >>> {line:s}\n"
         _read_dataset_till_end(unv, dataset, err)
 
+    # TODO:
+    # what if numints > 6 ?
     if len(line) == 2 + numints:
         ints = line[2:]
     else:
@@ -513,6 +554,8 @@ def _read_nodal_data(unv) -> dict:
         err += f"    >>> {line:s}\n"
         _read_dataset_till_end(unv, dataset, err)
 
+    # TODO:
+    # what if numfloats > 6 ?
     # Analysis Specifics - record 8
     lastPos, line = _read_and_parse_line(unv, f"{numfloats:n}E13.5", dataset, 8)
     if line == DELIMITER:  # end of DATASET
@@ -522,16 +565,16 @@ def _read_nodal_data(unv) -> dict:
     floats = line
 
     if analysis_type == 0: # analysis type = Unknown
-        result["id"] = ints[0]
-        id = result["id"]
+        id = ints[0]
         step = 1
+        result["id"] = id
 
         result["value"] = float[0]
 
     elif analysis_type == 1: # analysis type = Static
-        result["lcase"] = ints[0]
-        id = result["lcase"]
+        id = ints[0]
         step = 0
+        result["lcase"] = id
 
         result["value"] = floats[0]
 
@@ -568,7 +611,7 @@ def _read_nodal_data(unv) -> dict:
         id = ints[0]
         step = ints[1]
         result["lcase"] = id
-        result["frequency step number"] = step
+        result["frequency step"] = step
 
         result["frequency"] = floats[0]
 
@@ -618,10 +661,6 @@ def _read_nodal_data(unv) -> dict:
     result.setdefault("values", nodes)
 
     results = dict()
-    # results.setdefault(result["model type"], dict())
-    # results[result["model type"]].setdefault(result["analysis type"], dict())
-    # results[result["model type"]][result["analysis type"]].setdefault("NODAL", dict())
-    # results[result["model type"]][result["analysis type"]]["NODAL"][id] = nodes
     results.setdefault(id, dict())
     results[id].setdefault(step, result)
 
@@ -631,166 +670,218 @@ def _read_nodal_data(unv) -> dict:
 
 # TODO:
 # change to the simplified results {load case ID: {load step ID: {results}}}
-def _write_nodal_data(rid, result: dict, comment: str = None) -> str:
-    """
-    Returns a string with nodal data results
-    In:
-        int  rid    - result ID
-        dict result - nodal result data with following keys:
-                        - "id" result lcase/mode id
-                        - "description" (max 5 lines of 80 chars each
-                        - "model type" (Unknown, Structural, Heat Transfer, Fluid Flow)
-                        - "analysis type"
-                            - Unknown
-                            - Static
-                            - Normal Mode
-                            - Complex eigenvalue first order
-                            - Transient
-                            - Frequency Response
-                            - Buckling
-                            - Complex eigenvalue second order
-                        - "data characteristic"
-                            - Unknown
-                            - Scalar
-                            - 3 DOF Global Translation Vector
-                            - 6 DOF Global Translation & Rotation Vector
-                            - Symmetric Global Tensor
-                            - General Global Tensor
-                        - "specific data type"
-                            - Unknown
-                            - General
-                            - Stress
-                            - Strain
-                            - Element Force
-                            - Temperature
-                            - Heat Flux
-                            - Strain Energy
-                            - Displacement
-                            - Reaction Force
-                            - Kinetic Energy
-                            - Velocity
-                            - Acceleration
-                            - Strain Energy Density
-                            - Kinetic Energy Density
-                            - Hydro-Static Pressure
-                            - Heat Gradient
-                            - Code Checking Value
-                            - Coefficient Of Pressure
-                        - "data type" (Real, Complex)
-                        - "values per node" int
-
-    Out:
-        str
-    """
-    print(f"[+] Writing {result['analysis type']:s} Analysis Nodal results ID {rid:n}.")
+def _write_nodal_data(lcID: int, lsID: int, result: dict, comment: str = None) -> str:
+    print(f"[+] Writing LCASE {lcID:n} LSTEP {lsID:n}.")
     if comment is not None:
-        dataset = comment + "\n"
+        dataset = "\n".join([CHAR(c) for c in comment.split("\n")]) + "\n"
     else:
         dataset = ""
+
     dataset += DELIMITER + "\n"
 
-    dataset += DATASET.format({v: k for k, v in DATASETS.items()}["NODAL"])
+    dataset += DATASET({v: k for k, v in DATASETS.items()}["NODAL"])
 
-    if "id" in result.keys():
-        rid = result["id"]
-    else:
-        rid = rid
+    description = ["NONE"] * 5 if "description" not in result.keys() else result["description"].split("\n")
+    if len(description) < 5:
+        description += ["NONE"] * (5 - len(description))
 
-    if "description" in result.keys():
-        dataset += "\n".join([d[:80] for d in result["description"].split("\n")[:5]]) + "\n"
-    else:
-        dataset += "\n".join(["NONE"] * 5) + "\n"
+    dataset += "\n".join([CHAR(d) for d in description]) + "\n"
 
     if "model type" in result.keys():
         mt = {v: k for k, v in MODEL_TYPE.items()}[result["model type"]]
     else:
         mt = 0
+
     if "analysis type" in result.keys():
         at = {v: k for k, v in ANALYSIS_TYPE.items()}[result["analysis type"]]
     else:
         at = 0
+
     if "data characteristic" in result.keys():
         dc = {v: k for k, v in DATA_CHARACTERISTIC.items()}[result["data characteristic"]]
     else:
         dc = 0
+
     if "specific data type" in result.keys():
         sd = {v: k for k, v in SPECIFIC_DATA_TYPE.items()}[result["specific data type"]]
     else:
         sd = 0
+
     if "data type" in result.keys():
         dt = {v: k for k, v in DATA_TYPE.items()}[result["data type"]]
     else:
-        if type(result["values"][list(result["values"].keys())[0]][0]) is float:
-            dt = DATA_TYPE["Real"] # 2
-            datalen = 1
-        else:
-            dt = DATA_TYPE["Complex"] # 5
-            datalen = 2
+        first_val = result["values"][list(result["values"].keys())[0]][0]
+        if type(first_val) in (int, np.int):
+            dt = DATA_TYPE["Integer"]        # 1
+            FMT = INTEGER
+            numvals = 8
+        elif type(first_val) in (float, np.float, np.float16, np.float32, np.float64):
+            dt = DATA_TYPE["Real"]           # 2
+            FMT = SINGLE
+            numvals = 6
+        elif type(first_val) is np.float128:
+            dt = DATA_TYPE["Real Double"]    # 2
+            FMT = DOUBLE
+            numvals = 3
+        elif type(first_val) in (complex, np.complex, np.complex128):
+            dt = DATA_TYPE["Complex"]        # 5
+            FMT = SINGLE
+            numvals = 6
+        elif type(first_val) is np.complex256:
+            dt = DATA_TYPE["Complex Double"] # 6
+            FMT = DOUBLE
+            numvals = 3
+        else: # default
+            dt = DATA_TYPE["Real"]           # 2
+            FMT = SINGLE
+            numvals = 6
+
     if "values per node" in result.keys():
         nvals = result["values per node"]
     else:
-        nvals = len(result["values"][list(result["values"].keys())[0]]) * datalen
+        nvals = len(result["values"][list(result["values"].keys())[0]])
 
-    dataset += f"{mt:10n}{at:10n}{dc:10n}{sd:10n}{dt:10n}{nvals:10n}\n"
+    dataset += INTEGER(mt)
+    dataset += INTEGER(at)
+    dataset += INTEGER(dc)
+    dataset += INTEGER(sd)
+    dataset += INTEGER(dt)
+    dataset += INTEGER(nvals)
+    dataset += "\n"
 
     if at == 0: # Unknown
-        dataset += f"{1:10n}{1:10n}{rid:10n}\n"
-        dataset += f"{0.0:13.5E}\n"
+        dataset += INTEGER(1)
+        dataset += INTEGER(1)
+        dataset += INTEGER(lcID) + "\n"
+        dataset += SINGLE(0.0) + "\n"
 
     elif at == 1: # Static
-        dataset += f"{1:10n}{1:10n}{result['lcase']:10n}\n"
-        dataset += f"{0.0:13.5E}\n"
+        dataset += INTEGER(1)
+        dataset += INTEGER(1)
+        dataset += INTEGER(lcID) + "\n"
+        dataset += SINGLE(0.0) + "\n"
 
     elif at == 2: # Normal Mode
-        dataset += f"{2:10n}{4:10n}{result['id']:10n}{result['mode']:10n}\n"
-        dataset += f"{result['frequency']:13.5E}"
-        if "modal mass" in result.keys():
-            dataset += f"{result['modal mass']:13.5E}"
-        else:
-            dataset += f"{0.0:13.5E}"
-        if "modal viscous damping ratio" in result.keys():
-            dataset += f"{result['modal viscous damping ratio']:13.5E}"
-        else:
-            dataset += f"{0.0:13.5E}"
-        if "modal hysteric damping ratio" in result.keys():
-            dataset += f"{result['modal hysteric damping ratio']:13.5E}\n"
-        else:
-            dataset += f"{0.0:13.5E}\n"
+        dataset += INTEGER(2)
+        dataset += INTEGER(4)
+        dataset += INTEGER(lcID)
+        mode = result["mode"]
+        if mode != lsID:
+            print(f"[i] renumbering LCASE {lcID:n} mode number from {mode:n} to {lsID:n}.")
+            mode = lsID
+        dataset += INTEGER(mode) + "\n"
+
+        mm = result["modal mass"] if "modal mass" in result.keys() else 0.0
+        mvdr = result["modal viscous damping ratio"] if "modal viscous damping ratio" in result.keys() else 0.0
+        mhdr = result["modal hysteric damping ratio"] if "modal hysteric damping ratio" in result.keys() else 0.0
+
+        dataset += SINGLE(result["frequency"])
+        dataset += SINGLE(mm)
+        dataset += SINGLE(mvdr)
+        dataset += SINGLE(mhdr)
+        dataset += "\n"
 
     elif at == 3: # Complex Eigenvalue
-        dataset += f"{2:10n}{6:10n}{result['lcase']:10n}{result['mode']:10n}\n"
-        dataset += f"{result['eigenvalue'].real:13.5E}{result['eigenvalue'].imag:13.5E}"
-        dataset += f"{result['modal A'].real:13.5E}{result['modal A'].imag:13.5E}"
-        dataset += f"{result['modal B'].real:13.5E}{result['modal B'].imag:13.5E}\n"
+        dataset += INTEGER(2)
+        dataset += INTEGER(6)
+        dataset += INTEGER(lcID)
+        mode = result["mode"]
+        if mode != lsID:
+            print(f"[i] renumbering LCASE {lcID:n} mode number from {mode:n} to {lsID:n}.")
+            mode = lsID
+        dataset += INTEGER(mode) + "\n"
+
+        ev = result["eigenvalue"]
+        mA = result["modal A"] if "modal A" in result.keys() else complex(0., 0.)
+        mB = result["modal B"] if "modal B" in result.keys() else complex(0., 0.)
+
+        if type(ev) not in (complex, np.complex, np.complex128, np.complex256):
+            ev = complex(ev, 0.)
+
+        if type(mA) not in (complex, np.complex, np.complex128, np.complex256):
+            mA = complex(mA, 0.)
+
+        if type(mB) not in (complex, np.complex, np.complex128, np.complex256):
+            mB = complex(mB, 0.)
+
+        dataset += SINGLE(ev.real) + SINGLE(ev.imag)
+        dataset += SINGLE(mA.real) + SINGLE(mA.imag)
+        dataset += SINGLE(mB.real) + SINGLE(mB.imag)
+        dataset += "\n"
 
     elif at == 4: # Transient
-        dataset += f"{2:10n}{1:10n}{result['lcase']:10n}{result['time step']:10n}\n"
-        dataset += f"{result['time']:13.5E}\n"
+        dataset += INTEGER(2)
+        dataset += INTEGER(1)
+        dataset += INTEGER(lcID)
+        tstep = result["time step"]
+        if tstep != lsID:
+            print(f"[i] renumbering LCASE {lcID:n} mode number from {tstep:n} to {lsID:n}.")
+            tstep = lsID
+        dataset += INTEGER(tstep) + "\n"
+
+        dataset += SINGLE(result["time"]) + "\n"
 
     elif at == 5: # Frequency Response
-        dataset += f"{2:10n}{1:10n}{result['lcase']:10n}{result['frequency step number']:10n}\n"
-        dataset += f"{result['frequency']:13.5E}\n"
+        dataset += INTEGER(2)
+        dataset += INTEGER(1)
+        dataset += INTEGER(lcID)
+        fstep = result["frequency step"]
+        if fstep != lsID:
+            print(f"[i] renumbering LCASE {lcID:n} mode number from {fstep:n} to {lsID:n}.")
+            fstep = lsID
+        dataset += INTEGER(fstep) + "\n"
+
+        dataset += SINGLE(result["frequency"]) + "\n"
 
     elif at == 6: # Buckling
-        dataset += f"{2:10n}{1:10n}{result['lcase']:10n}\n"
-        dataset += f"{result['eigenvalue']:13.5E}\n"
+        dataset += INTEGER(1)
+        dataset += INTEGER(1)
+        dataset += INTEGER(lcID) + "\n"
+
+        dataset += SINGLE(result["eigenvalue"]) + "\n"
 
     else: # General
-        dataset += f"{result['num of intvals']:10n}{result['num of realvals']:10n}"
-        for i in range(result["num of intvals"]):
-            dataset += f"{result['specific integer parameters'][i]:10n}"
-        dataset += "\n"
-        for i in range(result["num of realvals"]):
-            dataset += f"{result['specific real parameters'][i]:13.5E}"
-        dataset += "\n"
+        intvals = result["num of intvals"]
+        floatvals = result["num of realvals"]
+        dataset += INTEGER(intvals)
+        dataset += INTEGER(floatvals)
+
+        intvals = result["specific intger parameters"]
+        floatvals = result["specific real parameters"]
+        i = 1
+        for iv in intvals:
+            i += 1
+            dataset += INTEGER(iv)
+            if (i + 1) % 8 == 0:
+                dataset += "\n"
+        if dataset[-1] != "\n":
+            dataset += "\n"
+
+        for i, fv in enumerate(floatvals):
+            dataset += SINGLE(fv)
+            if (i + 1) % 8 == 0:
+                dataset += "\n"
+        if dataset[-1] != "\n":
+            dataset += "\n"
 
     for nid, values in result["values"].items():
-        dataset += f"{nid:10n}\n"
-        if DATA_TYPE[dt] == "Real":
-            values = [f"{val:13.5E}" for val in values]
+        dataset += INTEGER(nid) + "\n"
+        if DATA_TYPE[dt] in ("Complex", "Complex Double"):
+            vals = []
+            for val in values:
+                vals.append(FMT(val.real))
+                vals.append(FMT(val.imag))
+            values = vals
         else:
-            values = [f"{val.real:13.5E}{val.imag:13.5E}" for val in values]
-        dataset += "".join(values) + "\n"
+            values = [FMT(val) for val in values]
+
+        for i, val in enumerate(values):
+            dataset += val
+            if (i + 1) % numvals == 0:
+                dataset += "\n"
+
+        if dataset[-1] != "\n":
+            dataset += "\n"
 
     dataset += DELIMITER + "\n"
     return dataset
@@ -798,13 +889,17 @@ def _write_nodal_data(rid, result: dict, comment: str = None) -> str:
 
 # TODO:
 # rewrite for simplified results model
-def _write_data(results: dict) -> str:
+def _write_data(nresults: dict = None, eresults: dict = None) -> str:
     datasets = ""
-    for atype, rtype in results.items():
-        for rtype in rtype.keys():
-            if rtype == "NODAL":
-                for rid in results[atype]["NODAL"].keys():
-                    datasets += _write_nodal_data(rid, results[atype]["NODAL"][rid])
+    if nresults is not None:
+        for lcID in nresults.keys():
+            for lsID in nresults.keys():
+                datasets += _write_nodal_data(lcID, lsID, nresults[lcID][lsID])
+
+    if eresults is not None:
+        for lcID in eresults.keys():
+            for lsID in eresults.keys():
+                datasets += _write_elemental_data(lcID, lsID, eresults[lcID][lsID])
 
     return datasets
 
@@ -900,17 +995,22 @@ def read(filename: str) -> (dict, dict, dict, dict):
 
 
 
-def write(filename: str, nodes: dict, elements: dict=None, results: dict=None,
-          precision="double"):
+def write(filename: str, nodes: dict, elements: dict=None, nresults: dict=None,
+          eresults: dict=None, precision="double"):
     print(f"[i] Writing {os.path.realpath(filename):s}")
+
     if os.path.isdir(os.path.dirname(os.path.realpath(filename))):
+
         datasets = ""
+
         if nodes is not None:
             datasets += _write_nodes(nodes, precision)
+
         if elements is not None:
             datasets += _write_elements(elements)
-        if results is not None:
-            datasets += _write_data(results)
+
+        if nresults is not None or eresults is not None:
+            datasets += _write_data(nresults, eresults)
 
         with open(filename, "w") as unv:
             unv.write(datasets)
@@ -921,5 +1021,5 @@ def write(filename: str, nodes: dict, elements: dict=None, results: dict=None,
 if __name__ == "__main__":
     unv_file = "./res/test_hex_double.unv"
     nodes, elements, nresults, eresults = read(unv_file)
-    print(nresults)
+    print_dict(nresults)
 
