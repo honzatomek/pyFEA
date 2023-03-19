@@ -760,8 +760,12 @@ def Coherence(times: np.ndarray, signal1: np.ndarray, signal2: np.ndarray,
 
     return freq, coherence
 
-def crossSpectrum(x, y, nperseg=1000):
-    # from: https://stackoverflow.com/questions/51258394/compute-coherence-in-python
+
+
+def crossSpectrum(x, y, nperseg = 1000):
+    """
+    from: https://stackoverflow.com/questions/51258394/compute-coherence-in-python
+    """
     #-------------------Remove mean-------------------
     cross = np.zeros(nperseg, dtype='complex128')
     for ind in range(int(x.size / nperseg)):
@@ -776,29 +780,125 @@ def crossSpectrum(x, y, nperseg=1000):
         cfy = np.fft.fft(yp)
 
         # Get cross spectrum
-        cross += cfx.conj()*cfy
-    freq=np.fft.fftfreq(nperseg)
-    return cross, freq
+        cross += cfx.conj() * cfy
+
+    freq = np.fft.fftfreq(nperseg)
+    return freq, cross
 
 
 
 def test_crossSpectrum():
-    # from: https://stackoverflow.com/questions/51258394/compute-coherence-in-python
-    x=np.linspace(-2500,2500,50000)
-    noise=np.random.random(len(x))
-    y=10*np.sin(2*np.pi*x)
-    y2=5*np.sin(2*np.pi*x)+5+noise*50
+    """
+    from: https://stackoverflow.com/questions/51258394/compute-coherence-in-python
+    """
+    t = np.linspace(-2500., 2500., 50000.)
+    noise = np.random.random(len(x))
+    x = 10. * np.sin(2. * np.pi * x)
+    y =  5. * np.sin(2. * np.pi * x) + 5. + noise * 50.
 
-    p11,freq=crossSpectrum(y,y)
-    p22,freq=crossSpectrum(y2,y2)
-    p12,freq=crossSpectrum(y,y2)
+    freq, p11 = crossSpectrum(x, x)
+    freq, p22 = crossSpectrum(y, y)
+    freq, p12 = crossSpectrum(x, y)
 
     # coherence
-    coh=np.abs(p12)**2/p11.real/p22.real
+    coh = np.abs(p12) ** 2 / p11.real / p22.real
     plt.plot(freq[freq > 0], coh[freq > 0])
     plt.xlabel('Normalized frequency')
     plt.ylabel('Coherence')
     plt.show()
+
+
+
+class SpectrumWindow():
+    @classmethod
+    def Box(cls, M: int) -> np.ndarray:
+        w = np.ones(M)
+        return w
+
+    @classmethod
+    def Bartlett(cls, M: int) -> np.ndarray:
+        w = np.linspace(0., M - 1, M)
+        w = 2. / (M - 1) * ((M - 1) / 2. - np.abs(w - (M - 1) / 2))
+        return w
+
+    @classmethod
+    def BartlettHann(cls, M: int) -> np.ndarray:
+        b = cls.Bartlett(M)
+        h = cls.Hann(M)
+        w = 0.5 * (b + h)
+        return w
+
+    @classmethod
+    def Blackman(cls, M: int) -> np.ndarray:
+        w = np.linspace(0., M - 1, M)
+        w = 0.42 - 0.5 * np.cos(2. * np.pi * w / M) + 0.08 * np.cos(4. * np.pi * w / M)
+        return w
+
+    @classmethod
+    def Cosine(cls, M: int) -> np.ndarray:
+        w = np.linspace(0., M - 1, M)
+        w = np.cos(2. * np.pi * (0.5 * w - (M - 1) / 4) / (M - 1))
+        return w
+
+    @classmethod
+    def Exponential(cls, M: int, decay: float) -> np.ndarray:
+        w = np.linspace(0., M - 1, M)
+        center = float((M - 1) / 2)
+        w = np.e ** (-np.abs(w - center) / decay)
+        # w /= np.max(w)
+        return w
+
+    @classmethod
+    def Gauss(cls, M: int, stddev: float) -> np.ndarray:
+        w = np.linspace(0., M - 1, M)
+        w = np.e ** (- 0.5 * ((w - M / 2) / stddev) ** 2)
+        return w
+
+    @classmethod
+    def Hann(cls, M: int) -> np.ndarray:
+        w = np.linspace(0., M - 1, M)
+        w = 0.5 - 0.5 * np.cos(2. * np.pi * w / (M - 1))
+        return w
+
+    @classmethod
+    def Hamming(cls, M: int) -> np.ndarray:
+        w = np.linspace(0., M - 1, M)
+        w = 0.54 - 0.46 * np.cos(2. * np.pi * w / (M - 1))
+        return w
+
+    @classmethod
+    def Lanczos(cls, M: int) -> np.ndarray:
+        sinc = lambda x: np.sin(np.pi * x) / np.pi / x
+        w = np.linspace(0., M - 1, M)
+        w = sinc(2 * w / (M - 1) - 1)
+        return w
+
+    @classmethod
+    def plot_all(cls, M: int = 51, xmax: float = 1.):
+        x = np.linspace(0., xmax, M)
+
+        w = cls.Box(M)
+        # plt.plot(x, w, label="Box")
+        # w = cls.Bartlett(M)
+        # plt.plot(x, w, label="Bartlett")
+        # w = cls.BartlettHann(M)
+        # plt.plot(x, w, label="BartlettHann")
+        # w = cls.Blackman(M)
+        # plt.plot(x, w, label="Blackman")
+        # w = cls.Cosine(M)
+        # plt.plot(x, w, label="Cosine")
+        w = cls.Exponential(M, 3.0)
+        plt.plot(x, w, label="Exponential")
+        w = cls.Gauss(M, 7.)
+        # plt.plot(x, w, label="Gauss")
+        # w = cls.Hann(M)
+        plt.plot(x, w, label="Hann")
+        w = cls.Hamming(M)
+        # plt.plot(x, w, label="Hamming")
+        # w = cls.Lanczos(M)
+        # plt.plot(x, w, label="Lanczos")
+        plt.legend()
+        plt.show()
 
 
 
@@ -814,5 +914,6 @@ def test():
 
 
 if __name__ == "__main__":
-    test_crossSpectrum()
+    # test_crossSpectrum()
+    SpectrumWindow.plot_all(51, 100.)
 

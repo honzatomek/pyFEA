@@ -391,6 +391,8 @@ def coherence(unv_file: str, sweep_file: str, sampling_rate: float = 4.,
     if save_plots:
         png_basename = os.path.join(os.path.dirname(os.path.realpath(unv_file)),
                                     os.path.splitext(os.path.basename(unv_file))[0])
+        if butterworth:
+            png_basename += "_" + butterworth
     else:
         png_basename = None
 
