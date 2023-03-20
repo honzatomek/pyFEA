@@ -14,7 +14,8 @@ DATASETS = {  15: "NODE",
               55: "NODAL",
               56: "ELEMENTAL",
              773: "MATERIAL",
-              18: "CSYS"}
+              18: "CSYS",
+             258: "CONSTRAINT"}
 
 NODES = {  "NODE": "single",
          "NODE2P": "double"}
@@ -645,6 +646,69 @@ def _write_elements(elements: dict, comment: str = None):
                     dataset = dataset[:-1]
             else:
                 dataset += "\n"
+
+    dataset += DELIMITER + "\n"
+
+    return dataset
+
+
+
+def _read_constraints(unv) -> dict:
+    print(f"[+] Reading Materials.")
+
+    lastPos, line = _read_line(unv) # DATASET number
+    dataset = int(line.strip())
+
+    cset = {}
+
+    while True:
+        # record 1
+        lastPos, line = _read_and_parse_line(unv, "4I10,7I2", dataset, 1)
+        if line == DELIMITER:
+            break
+
+        constraint = {}
+
+        cset = line[0]
+        cid = line[1]
+        nid = line[2]
+        color = line[3]
+        dofs = [d == 1 for d in line[4:]]
+
+        cset.setdefault(cid, {"nid": nid, "dofs": dofs})
+
+    return constraints
+
+
+
+def _write_constraints(cset: dict, comment: str = None) -> str:
+    print(f"[+] Writing Constraints.")
+    if comment is not None:
+        dataset = "\n".join([CHAR(c) for c in comment.split("\n")]) + "\n"
+    else:
+        dataset = ""
+
+    dataset += DELIMITER + "\n"
+
+    dataset += DATASET({v: k for k, v in DATASETS.items()}["CONSTRAINT"])
+
+    for csetid, constraints in cset.items():
+        for cid, constraint in cset[csetid].items():
+            color = constraint["color"] if "color" in constraint.keys() else 1
+
+            dataset += INTEGER(csetid}
+            dataset += INTEGER(cid}
+            dataset += INTEGER(constraint["nid"])
+            dataset += INTEGER(color)
+
+            dofs = constraint["dofs"]
+            if len(dofs) < 7:
+                dofs += [False] * (7 - len(dofs))
+
+            for d in dofs:
+                dataset += f"{int(d):2n}"
+
+            dataset += "\n"
 
     dataset += DELIMITER + "\n"
 
