@@ -1,3 +1,8 @@
+# TODO:
+# store read data as a model
+# possibility to read only one type of dataset
+
+
 import os
 import sys
 import io
@@ -9,13 +14,25 @@ DELIMITER = f"{-1:6n}"
 DATASET = lambda x: f"{x:>6n}\n"
 
 DATASETS = {  15: "NODE",
+             781: "NODE2P",
             2411: "NODE2P",
             2412: "ELEMENT",
+            2114: "NODAL ELEMENTAL" # TODO
               55: "NODAL",
-              56: "ELEMENTAL",
+              56: "ELEMENTAL", # TODO
              773: "MATERIAL",
-              18: "CSYS",
-             258: "CONSTRAINT"}
+              18: "CSYS",      # TODO can be 2420
+             755: "PRESCRIBED", # TODO
+             257: "PRESCRIBED", # TODO !!!
+             258: "SUPPRESSED", # TODO   ??? 757 ???
+             # 836: "SHELL THICKNESS"  # TODO
+             772: "PROPERTY"   # TODO
+             754: "MPC",        # TODO
+             782: "LOAD"}      # TODO
+# TODO:
+# prescribed nodes
+# properties
+# materials ?
 
 NODES = {  "NODE": "single",
          "NODE2P": "double"}
@@ -230,6 +247,10 @@ CSYS_TYPE = {0: "Cartesian",
 #                    5: "zy"}
 CSYS =_DEFINITION = {1: "xz"} # origin, +x axis, +xz plane
 
+PRESCRIBED_TYPE = {0: "empty",
+                   1: "displacement",
+                   2: "temperature"}
+
 
 FORMAT = {"I": int,
           "E": float,
@@ -425,6 +446,10 @@ def _write_csys(csys: dict, comment: str = None) -> str:
         dataset += INTEGER(cref)
         dataset += INTEGER(color)
         dataset += INTEGER(cdef) + "\n"
+
+        # TODO:
+        # if "def" in cs.keys():
+        #     transform definition to xz
 
         dataset += SINGLE(origin) + SINGLE(xaxis) + "\n"
         dataset += SINGLE(xzplane) + "\n"
@@ -653,13 +678,13 @@ def _write_elements(elements: dict, comment: str = None):
 
 
 
-def _read_constraints(unv) -> dict:
-    print(f"[+] Reading Materials.")
+def _read_suppressed(unv) -> dict:
+    print(f"[+] Reading Suppressed Constraints.")
 
     lastPos, line = _read_line(unv) # DATASET number
     dataset = int(line.strip())
 
-    cset = {}
+    suppressed = {}
 
     while True:
         # record 1
@@ -667,22 +692,20 @@ def _read_constraints(unv) -> dict:
         if line == DELIMITER:
             break
 
-        constraint = {}
-
         cset = line[0]
         cid = line[1]
         nid = line[2]
         color = line[3]
         dofs = [d == 1 for d in line[4:]]
 
-        cset.setdefault(cid, {"nid": nid, "dofs": dofs})
+        suppressed.setdefault(cid, {"nid": nid, "dofs": dofs})
 
-    return constraints
+    return suppressed
 
 
 
-def _write_constraints(cset: dict, comment: str = None) -> str:
-    print(f"[+] Writing Constraints.")
+def _write_suppressed(cset: dict, comment: str = None) -> str:
+    print(f"[+] Writing Suppressed Constraints.")
     if comment is not None:
         dataset = "\n".join([CHAR(c) for c in comment.split("\n")]) + "\n"
     else:
@@ -690,14 +713,14 @@ def _write_constraints(cset: dict, comment: str = None) -> str:
 
     dataset += DELIMITER + "\n"
 
-    dataset += DATASET({v: k for k, v in DATASETS.items()}["CONSTRAINT"])
+    dataset += DATASET({v: k for k, v in DATASETS.items()}["SUPPRESSED"])
 
     for csetid, constraints in cset.items():
         for cid, constraint in cset[csetid].items():
             color = constraint["color"] if "color" in constraint.keys() else 1
 
-            dataset += INTEGER(csetid}
-            dataset += INTEGER(cid}
+            dataset += INTEGER(csetid)
+            dataset += INTEGER(cid)
             dataset += INTEGER(constraint["nid"])
             dataset += INTEGER(color)
 
@@ -705,14 +728,127 @@ def _write_constraints(cset: dict, comment: str = None) -> str:
             if len(dofs) < 7:
                 dofs += [False] * (7 - len(dofs))
 
-            for d in dofs:
-                dataset += f"{int(d):2n}"
+            dataset += "".join([f"{int(d):2n}" for d in dofs])
 
             dataset += "\n"
 
     dataset += DELIMITER + "\n"
 
     return dataset
+
+
+
+def _read_prescribed(unv) -> dict:
+    print(f"[+] Reading Prescribed Constraints.")
+
+    lastPos, line = _read_line(unv) # DATASET number
+    dataset = int(line.strip())
+
+    prescribed = {}
+
+    # TODO:
+    while line != DELIMITER:
+        lastPos, line = _read_and_parse_line(unv, "2I10", dataset, 1)
+        if line == DELIMITER:
+            break
+
+        lset = line[0]
+        # 0 = empty, 1 = displacement, 2 = temperature
+        ltype = PRESCRIBED_TYPE[line[1]]
+
+        lastPos, line = _read_line(unv,
+            msg_eof = f"[-] File ended before closing the dataset {dataset:n}\n")
+        if line == DELIMITER:  # end of DATASET
+            err = f"[-] Dataset {dataset:n} ended on line {_LINENUMBER:n} before finishing Prescribed Constraints.\n"
+            raise ReadError(err)
+
+        lname = str(line[:80]).strip()
+
+        if ltype not in prescribed.keys():
+            prescribed.setdefault(ltype, {lset: {"name": lname}})
+
+        if ltype == "displacement":
+            while True:
+                # record 3
+                lastPos, line = _read_and_parse_line(unv, "2I10,9I2", dataset, 3)
+                if line == DELIMITER:
+                    break
+
+                cnum = line[0]
+                color = line[1]
+                dofs = [bool(d) for d in line[2:8]]
+                ctype = line[9]
+                axis_modifier = line[10]
+
+                # record 4
+                lastPos, line = _read_and_parse_line(unv, "3D25.16", dataset, 4)
+                if line == DELIMITER:
+                    err = f"[-] Dataset {dataset:n} ended on line {_LINENUMBER:n} before finishing Prescribed Constraint {cnum:n}.\n"
+                    raise ReadError(err)
+
+                disps = line
+
+                # record 5
+                lastPos, line = _read_and_parse_line(unv, "3D25.16", dataset, 5)
+                if line == DELIMITER:
+                    err = f"[-] Dataset {dataset:n} ended on line {_LINENUMBER:n} before finishing Prescribed Constraint {cnum:n}.\n"
+                    raise ReadError(err)
+
+                disps += line
+
+                # TODO:
+                # discard at this moment
+                # record 6
+                lastPos, line = _read_and_parse_line(unv, "6I10", dataset, 6)
+                if line == DELIMITER:
+                    err = f"[-] Dataset {dataset:n} ended on line {_LINENUMBER:n} before finishing Prescribed Constraint {cnum:n}.\n"
+                    raise ReadError(err)
+
+                prescribed[ltype][lset].setdefault(cnum, {"dofs": dofs, "displacements": disps})
+
+        elif ltype == "temperature":
+            while True:
+                # record 3
+                lastPos, line = _read_and_parse_line(unv, "3I10", dataset, 3)
+                if line == DELIMITER:
+                    break
+
+                cnum = line[0]
+                color = line[1]
+                ctype = line[2] # 0 - 1 value on node, non shell
+                                # 1 - 1 value on node, shell middle
+                                # 2 - 2 values on node, shell top and bottom
+                                # 3 - 2 values on node, shell middle and gradient
+                                # 4 - 1 value on node, temperature gradient
+                tempnum = 2 if ctype in (2, 3) else 1
+
+                # record 4
+                lastPos, line = _read_and_parse_line(unv, str(tempnum) + "D25.16", dataset, 4)
+                if line == DELIMITER:
+                    err = f"[-] Dataset {dataset:n} ended on line {_LINENUMBER:n} before finishing Prescribed Constraint {cnum:n}.\n"
+                    raise ReadError(err)
+
+                temp = line
+
+                if cnum not in prescribed[ltype][lset].keys():
+                    prescribed[ltype][lset].setdefault(num, {})
+
+                if ctype == 0:
+                    prescribed[ltype][lset][cnum]["nodal"] = temp
+                elif ctype = 1:
+                    prescribed[ltype][lset][cnum]["middle"] = temp
+                elif ctype = 2:
+                    prescribed[ltype][lset][cnum]["top"] = temp[0]
+                    prescribed[ltype][lset][cnum]["bottom"] = temp[1]
+                elif ctype = 3:
+                    prescribed[ltype][lset][cnum]["middle"] = temp[0]
+                    prescribed[ltype][lset][cnum]["gradient"] = temp[1]
+                elif ctype = 4:
+                    prescribed[ltype][lset][cnum]["gradient"] = temp
+                else:
+                    prescribed[ltype][lset][cnum]["nodal"] = temp
+
+    return prescribed
 
 
 

@@ -36,7 +36,8 @@ TODO:
 
 6.   results variant
 
-7.   model
+TODO: most important at this moment
+7.   model  !!!
 
 8.   situation
 
@@ -2201,7 +2202,7 @@ class Properties(ContainerDict):
 
 
 # TODO:
-class CLoad(Id):
+class LoadN(Id):
     # def __init__(self, fetype: str, nid: int, lpat: int,
     #              Fx: float = None, Fy: float = None, Fz: float = None,
     #              Mx: float = None, My: float = None, Mz: float = None):
@@ -2585,7 +2586,36 @@ class Modification:
 
 # TODO:
 class Model:
-    pass
+    def __init__(self, component: str, **kwargs):
+        self._nodes = None
+        self.component = component
+
+        if "nodes" in kwargs.keys():
+            self.nodes = Nodes(kwargs["nodes"])
+
+        if "elements" in kwargs.keys()
+            self.elements = Elements(kwargs["elements"])
+
+        if "structure" in kwargs.keys():
+            self.structure = kwargs["structure"]
+
+    @property
+    def component(self) -> str:
+        return self._component
+
+    @component.setter
+    def component(self, component: str):
+        self._component = component
+
+    @property
+    def nodes(self) -> Nodes:
+        return self._nodes
+
+    @nodes.setter(self, nodes: Nodes):
+        if self._nodes is None:
+            self._nodes = nodes
+        else:
+            self._nodes += nodes
 
 
 # TODO:
