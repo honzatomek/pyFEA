@@ -10,6 +10,13 @@ import math
 
 import pdb
 
+try:
+    import pyFEA.model as model
+except ImportError as e:
+    __PATH__ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+    sys.path.append(__PATH__)
+    import pyFEA.model as model
+
 DELIMITER = f"{-1:6n}"
 DATASET = lambda x: f"{x:>6n}\n"
 
@@ -17,7 +24,7 @@ DATASETS = {  15: "NODE",
              781: "NODE2P",
             2411: "NODE2P",
             2412: "ELEMENT",
-            2114: "NODAL ELEMENTAL" # TODO
+            2114: "NODAL ELEMENTAL", # TODO
               55: "NODAL",
               56: "ELEMENTAL", # TODO
              773: "MATERIAL",
@@ -26,7 +33,7 @@ DATASETS = {  15: "NODE",
              257: "PRESCRIBED", # TODO !!!
              258: "SUPPRESSED", # TODO   ??? 757 ???
              # 836: "SHELL THICKNESS"  # TODO
-             772: "PROPERTY"   # TODO
+             772: "PROPERTY",   # TODO
              754: "MPC",        # TODO
              782: "LOAD"}      # TODO
 # TODO:
@@ -835,15 +842,15 @@ def _read_prescribed(unv) -> dict:
 
                 if ctype == 0:
                     prescribed[ltype][lset][cnum]["nodal"] = temp
-                elif ctype = 1:
+                elif ctype == 1:
                     prescribed[ltype][lset][cnum]["middle"] = temp
-                elif ctype = 2:
+                elif ctype == 2:
                     prescribed[ltype][lset][cnum]["top"] = temp[0]
                     prescribed[ltype][lset][cnum]["bottom"] = temp[1]
-                elif ctype = 3:
+                elif ctype == 3:
                     prescribed[ltype][lset][cnum]["middle"] = temp[0]
                     prescribed[ltype][lset][cnum]["gradient"] = temp[1]
-                elif ctype = 4:
+                elif ctype == 4:
                     prescribed[ltype][lset][cnum]["gradient"] = temp
                 else:
                     prescribed[ltype][lset][cnum]["nodal"] = temp
