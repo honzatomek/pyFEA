@@ -1,5 +1,5 @@
-#!/usr/bin/python3
-"""author:  Jan Tomek
+#!/opt/python385_std/bin/python3
+"""author:  Jan Tomek <jan.tomek.ext@stihl.de>
 date:    17.3.2023
 version: v1.0.0
 
@@ -8,11 +8,14 @@ Coherence Analysis of signals from frequency sweep shaker measurement, where
 the driving node input is compared to the accelerations on the measured
 nodes."""
 
+import pdb
+
 
 import os
 import sys
 import argparse
 import warnings
+import math
 
 
 from math import degrees, radians, sin
@@ -25,7 +28,9 @@ from matplotlib.gridspec import GridSpec as gridspec
 sys.path.append('.')
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
+import utils
 from utils import UNV
+from utils import POST
 
 warnings.filterwarnings("ignore")
 # warnings.filterwarnings("ignore", module = "matplotlib")
@@ -34,6 +39,8 @@ DOFS = {"x": 0,
         "y": 1,
         "z": 2}
 DIRS = {v: k for k, v in DOFS.items()}
+DOF = lambda x: DOFS[str(x).lower()]
+DIR = lambda x: DIRS[int(float(x))]
 
 E = lambda msg, i = 0: " " * i + "[-] " + msg
 I = lambda msg, i = 0: " " * i + "[+] " + msg
@@ -82,7 +89,7 @@ def plot_multiple(x: list, y: list, labels: list, titles: list,
     j1  set2 [ plot1, plot2]
     j2  set3 [ plot1, plot2, plot2]
     """
-    print(N(f"Plotting {plot_title:s}", offset))
+    print(N(f"Plotting: {plot_title:s}", offset))
 
     nsets = len(y)
     nplots = max([len(y[i]) for i in range(len(y))])
@@ -112,7 +119,125 @@ def plot_multiple(x: list, y: list, labels: list, titles: list,
     # fig.tight_layout()
 
     if save is not None:
-        print(N(f"Saving plot {plot_title:s} as {save:s}", offset + 2))
+        print(N(f"Saving plot: {plot_title:s}", offset + 2))
+        print(N(f"{save:s}", offset + 4))
+        plt.savefig(save)
+
+    if show_immediately:
+        plt.show()
+
+
+
+def explode_points(points: np.ndarray, xbounds: np.ndarray, ybounds: np.ndarray,
+                   points_offset: float = 25) -> np.ndarray:
+
+    # normalise points to range (0, 1)
+    points_new = points.copy()
+    points_new[:,0] = (points_new[:,0] - xbounds[0]) / (xbounds[1] - xbounds[0])
+    points_new[:,1] = (points_new[:,1] - ybounds[0]) / (ybounds[1] - ybounds[0])
+
+    # center of plot
+    center = np.array([0.5 , 0.5], dtype=float)
+
+    # get offset vectors to explode the points
+    for i, point in enumerate(points_new):
+        vec = point - center
+        vec /= np.linalg.norm(vec)
+        vec *= points_offset
+        points_new[i] = vec.copy()
+
+    points_new = np.array(points_new, dtype=int)
+
+    return points_new
+
+
+def plot_multiple_rows(x: list, y: list, labels: list, titles: list,
+                       xaxis: list, yaxis: list, plot_title: str, annotation: list = None,
+                       ylim: list = None, xlim: list = None,
+                       show_immediately: bool = False, save: str = None, offset: int = 0):
+    """
+                i0     i1     i2
+    j0  set1 [ plot1, plot2, plot2]
+    j1  set2 [ plot1, plot2]
+    j2  set3 [ plot1, plot2, plot2]
+    """
+    print(N(f"Plotting: {plot_title:s}", offset))
+
+    nsets = len(y)
+    nplots = max([len(yy) for yy in y])
+    fig = plt.figure(figsize=(16, 10), constrained_layout=True, dpi=80)
+
+    nrows = int(math.floor(nplots ** 0.5))
+    ncols = int(math.ceil(nplots / nrows))
+
+    gs = gridspec(nrows=nrows, ncols=ncols, figure = fig)
+    gs.update(left = 0.05, right = 0.95, top = 0.90, bottom = 0.05)
+    # fig, axs = plt.subplots(nrows=1, ncols=nplots, tight_layout=True)
+
+    color = None
+
+    axs = []
+    for i in range(nrows):
+        for j in range(ncols):
+            idx = int(i * nrows + j)
+            if idx >= nplots:
+                continue
+
+            axs.append(fig.add_subplot(gs[i, j]))
+
+            for k in range(nsets):
+                if y[k][idx] is None:
+                    continue
+
+                elif y[k][idx].dtype in (complex, np.complex, np.complex64, np.complex128, np.complex256):
+                    axs[idx].plot(x[k][idx], y[k][idx].real, label=labels[k][idx] + " real")
+                    color = axs[idx].get_lines()[-1].get_color()
+                    axs[idx].plot(x[k][idx], y[k][idx].imag, label=labels[k][idx] + " imag")
+                else:
+                    axs[idx].plot(x[k][idx], y[k][idx], label=labels[k][idx])
+                    color = axs[idx].get_lines()[-1].get_color()
+
+                if annotation is not None and annotation[k][idx] is not None and annotation[k][idx].shape[0] != 0:
+
+                    if xlim is not None and xlim[idx] is not None:
+                        xbounds = xlim[idx]
+                    else:
+                        xbounds = (x[k][idx][0], x[k][idx][-1])
+
+                    if ylim is not None and ylim[idx] is not None:
+                        ybounds = ylim[idx]
+                    else:
+                        ybounds = (np.min(y[k][idx]), np.max(y[k][idx]))
+
+                    offset_a = explode_points(annotation[k][idx], xbounds, ybounds, points_offset=25)
+
+                    alignment_h = ["left" if oa[0] >= 0 else "right" for oa in offset_a]
+                    alignment_v = ["bottom" if oa[1] >= 0 else "top" for oa in offset_a]
+
+                    for a, (xya, xyo) in enumerate(zip(annotation[k][idx], offset_a)):
+                        axs[idx].annotate(f"{xya[0]:.2f}", xya,
+                                          textcoords="offset points",
+                                          xytext=xyo, ha=alignment_h[a], va=alignment_v[a],
+                                          color=color,
+                                          arrowprops=dict(arrowstyle="->"))
+
+            axs[idx].set_title(titles[idx])
+            axs[idx].set_xlabel(xaxis[idx])
+            axs[idx].set_ylabel(yaxis[idx])
+
+            if xlim is not None and xlim[idx] is not None:
+                axs[idx].set_xlim(left=xlim[idx][0], right=xlim[idx][1])
+
+            if ylim is not None and ylim[idx] is not None:
+                axs[idx].set_ylim(bottom=ylim[idx][0], top=ylim[idx][1])
+
+            axs[idx].legend()
+    fig.suptitle(plot_title)
+    # fig.tight_layout()
+
+    if save is not None:
+        print(N(f"Saving plot: {plot_title:s}", offset + 2))
+        print(N(f"{save:s}", offset + 4))
         plt.savefig(save)
 
     if show_immediately:
@@ -133,8 +258,7 @@ def plot1(x, y, label, title):
 
 
 
-def resample(time: np.ndarray, freq: np.ndarray,
-             time_resampled: np.ndarray, freq_resampled: np.ndarray,
+def resample(time_resampled: np.ndarray, freq_resampled: np.ndarray, freq: np.ndarray,
              signal: np.ndarray, sampling_frequency: float,
              signal_label: str, offset: int = 0) -> np.ndarray:
 
@@ -163,8 +287,7 @@ def resample(time: np.ndarray, freq: np.ndarray,
 
 
 
-def butterworth_lowpass_filter(signal: np.ndarray, fs: float, cutoff: float,
-                               offset: int = 0) -> np.ndarray:
+def butterworth_lowpass_filter(signal: np.ndarray, fs: float, cutoff: float, offset: int = 0) -> np.ndarray:
     """
     Butterworth Lowpass filter
 
@@ -194,8 +317,7 @@ def butterworth_lowpass_filter(signal: np.ndarray, fs: float, cutoff: float,
 
 
 
-def butterworth_highpass_filter(signal: np.ndarray, fs: float, cutoff: float,
-                                offset: int = 0) -> np.ndarray:
+def butterworth_highpass_filter(signal: np.ndarray, fs: float, cutoff: float, offset: int = 0) -> np.ndarray:
     """
     Butterworth Highpass filter
 
@@ -260,7 +382,7 @@ def butterworth_bandpass_filter(signal: np.ndarray, fs: float,
 
 
 
-def read_sweep_table(sweep_table: str, offset: int = 0) -> dict:
+def read_sweep_table(sweep_table: str, offset: int = 0) -> np.ndarray:
     """
     sweep_table:      (str) sweep table *.txt file with setting of the shaker
                       data can contain columns headers, if headers are present,
@@ -279,7 +401,7 @@ def read_sweep_table(sweep_table: str, offset: int = 0) -> dict:
     """
 
     print(I(f"Reading {sweep_table:s}", offset))
-    vals = {}
+    vals = []
     freq = 0
     time = 1
 
@@ -312,76 +434,246 @@ def read_sweep_table(sweep_table: str, offset: int = 0) -> dict:
                     continue
 
             line = [float(v) for v in line.split()]
-            vals.setdefault(line[freq], line[time])
+            vals.append([line[freq], line[time]])
+
+        vals = np.array(vals, dtype=float)
 
     return vals
 
 
 
-def coherence(unv_file: str, sweep_file: str, sampling_rate: float = 4.,
+def add_curve(curves: dict, node: int, dir: int, x: np.ndarray, y: np.ndarray, datalen: int = 3) -> dict:
+    """
+    adds a signal curve for dof d into a dictionary {frequency: {node: np.ndarray(dof0, dof1, ...)} }
+    """
+    for i, f in enumerate(x):
+        # f = float(f"{f:.3f}")
+        if f not in curves.keys():
+            curves.setdefault(f, {})
+
+        if node not in curves[f].keys():
+            curves[f].setdefault(node, [0.] * datalen)
+
+        curves[f][node][dir] = y[i]
+
+    return curves
+
+
+
+def frequency_time_nodes(data: dict, sweep_table: np.ndarray) -> (np.ndarray, np.ndarray, list, int):
+    """
+    extracts frequencies, node numbers, driving node number from the data dictionary
+
+    also converts the frequencies to the time domain based on the sweep tabel
+    """
+    # get all frequencies
+    freq = np.array(list(sorted(data.keys())), dtype = float)
+
+    # discard all that are out of sweep table bounds
+    freq = freq[(freq >= sweep_table[0,0]) & (freq <= sweep_table[-1,0])]
+
+    # convert freq to time using linear interpolation
+    time = np.interp(freq, sweep_table[:,0], sweep_table[:,1])
+
+    # get all nodes
+    nodes = []
+    for f in freq:
+        nodes += list(data[f].keys())
+    nodes = list(sorted(list(set(nodes))))
+
+    # get driving node - lowest ID
+    steuernode = nodes.pop(0)
+
+    return freq, time, nodes, steuernode
+
+
+
+def process_signal(tr: np.ndarray, fr: np.ndarray, data: dict, allfreq: np.ndarray,
+                   node: int, dir: int, fs: float, butterworth: str, lf: float, hf: float,
+                   window: str, nperseg: int) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray):
+    """
+    In:
+        tr:          vector of resampled time
+        fr:          vector fo resampled frequencies
+        data:        data dictionary {freq: {node: np.ndarray}} with all signals
+        allfreq:     vector with all frequencise in data
+        node:        ID of the node to process
+        dir:         ID of the dof to process (0 = x, 1 = y, 2 = z)
+        fs:          sampling frequency in Hz
+        butterworth: apply Butterworth filter (low/high/band)
+        lf:          low cutoff frequency for Butterworth filter
+        hf:          hight cutoff frequency for Butterworth filter
+        window:      name of window function for signal processing
+        nperseg:     number of segments for window function application
+
+    Out:
+        freq:        frequencies for this node and dof
+        signal:      originnal signal in complex domain
+        signal_r:    signal resampled to time domain tr
+        fxx:         PSD frequencies
+        Pxx:         PSD values
+    """
+
+    print(I(f"Processing Node: {node:n},{DIRS[dir]:s}"))
+
+    # get signal data
+    freq = np.array(list(sorted([f for f in allfreq if node in data[f].keys()])), dtype=float).flatten()
+    signal = np.array([data[f][node][dir] for f in freq], dtype=complex)
+
+    print(N(f"Transforming {node:n} to time domain.", 4))
+
+    # resample and convert to time domain
+    signal_r = resample(tr, fr, freq, signal, fs,
+                        f"Node {node:n},{DIRS[dir]:s}", offset=4)
+
+    # apply butterworth filter, if requested
+    if butterworth == "low":
+        stsignal_r = butterworth_lowpass_filter(stsignal_r, fs = fs,
+                                                cutoff = hf * fr[-1], offset = 4)
+    elif butterworth == "high":
+        stsignal_r = butterworth_highpass_filter(stsignal_r, fs=fs,
+                                                 cutoff = lf * fr[0], offset = 4)
+    elif butterworth == "band":
+        stsignal_r = butterworth_bandpass_filter(stsignal_r, fs = fs,
+                                                 lowcut = lf * fr[0],
+                                                 highcut = hf * fr[-1], offset = 4)
+
+    print(N(f"Creating {node:n},{DIRS[dir]:s} PSD", 4))
+    print(N(f"Filter Window: {window:s}", 6))
+    print(N(f"Segment Length: {nperseg:n}", 6))
+
+    fxx, Pxx = scipy.signal.welch(signal_r, fs, window=window, nperseg=nperseg)
+    Pxx = Pxx[(fxx >= fr[0]) & (fxx <= fr[-1])]
+    fxx = fxx[(fxx >= fr[0]) & (fxx <= fr[-1])]
+
+    return freq, signal, signal_r, fxx, Pxx
+
+
+
+def create_coherence(node: int, dir: int, sx: np.ndarray, sy: np.ndarray,
+                     f: np.ndarray, fs: float, window: str, nperseg: int) -> (np.ndarray, np.ndarray):
+    """
+    In:
+        node:        ID of the node to process
+        dir:         ID of the dof to process (0 = x, 1 = y, 2 = z)
+        sx:          first resampled signal in time domain
+        sy:          second resampled signal in time domain
+        f:           vector fo resampled frequencies
+        fs:          sampling frequency in Hz
+        nperseg:     number of segments for window function application
+
+    Out:
+        fxx:         Coherence frequencies
+        Pxx:         Coherence values
+    """
+    print(N(f"Creating {node:n},{DIRS[dir]:s} Coherence", 4))
+
+    fxy, Cxy = scipy.signal.coherence(sx, sy, fs=fs, window=window,
+                                      nperseg=nperseg)
+    Cxy = Cxy[(fxy >= f[0]) & (fxy <= f[-1])]
+    fxy = fxy[(fxy >= f[0]) & (fxy <= f[-1])]
+    cmax = np.max(Cxy)
+    cmin = np.min(Cxy)
+    print(N(f"Maximum up to {fxy[-1]:.2f} Hz: {cmax:.2f}", 6))
+    print(N(f"Minimum up to {fxy[-1]:.2f} Hz: {cmin:.2f}", 6))
+
+    # find peak values on signal flipped around the x axis
+    peaks, _ = scipy.signal.find_peaks(-1. * Cxy, prominence = 0.2)
+    print(N(f"Minima at: {', '.join([f'{f:.2f} Hz' for f in fxy[peaks]]):s}", 6))
+    peaks = np.array([fxy[peaks], Cxy[peaks]], dtype = float).T
+
+    return fxy, Cxy, peaks
+
+
+
+def write_post(filename: str, data: dict, abscissae: str = "FREQUENCY",
+               dattype: str = "AMPLITUDE", ncol: str = 2, curve: list = ["X", "Y", "Z"],
+               result_name: str = "Coherence", analysis: str = "AuReLa",
+               result_type: str = "COHERENCE"):
+
+    settings = {"COMPONENT": "KOMPO_1",
+                "RESULTS NAME": result_name,
+                "ANALYSIS": analysis,
+                "TYPE": result_type,
+                "ABSCISSAE": abscissae,
+                "NCOL": ncol,
+                "DATTYPE": dattype,
+                "CURVE": curve}
+
+    POST.write(filename, data, sameID=True, output='X_XYDATA', settings=settings)
+
+
+
+def coherence(unv_file: str, sweep_file: str, sampling_rate: float = 4., nperseg: int = 4096,
               window_filter: str = "hann", butterworth: bool = False, print_input: bool = False,
               show_plots: bool = False, show_immediately: bool = False, save_plots: bool = True):
     """
-    unv_file:         (str) path to *.unv file with results
-                      driving node is the node with lowest ID
-                      shaker direction is assumed from driving node results as the only one non-zero
+    unv_file:           (str) path to *.unv file with results
+                        driving node is the node with lowest ID
+                        shaker direction is assumed from driving node results as the only one non-zero
 
-    sweep_table:      (str) sweep table *.txt file with setting of the shaker
-                      data can contain columns headers, if headers are present,
-                      the needed values are "Frequency", "Freq" or "Freq." and "Time"
-                      or "Hz" and "s"
-                      headers have to be on the first row and start with "!"
-                      on other lines the "!" means comment
-                      if there are no heders the assumed order of columns is:
-                      Frequency Time
+    sweep_table:        (str) sweep table *.txt file with setting of the shaker
+                        data can contain columns headers, if headers are present,
+                        the needed values are "Frequency", "Freq" or "Freq." and "Time"
+                        or "Hz" and "s"
+                        headers have to be on the first row and start with "!"
+                        on other lines the "!" means comment
+                        if there are no heders the assumed order of columns is:
+                        Frequency Time
 
-                      data expample:
-                      ! Frequency  Time
-                        3.0    0.0
-                       15.0   96.0
-                      305.0 1256.0
+                        data expample:
+                        ! Frequency  Time
+                          3.0    0.0
+                         15.0   96.0
+                        305.0 1256.0
 
-    sampling_rate:    highest frequency multiplier for resampling of the results
-                      sampling frequency = sampling rate x highest frequency
-                      default = 4
+    sampling_rate:      highest frequency multiplier for resampling of the results
+                        sampling frequency = sampling rate x highest frequency
+                        default = 4
 
-    window_filter:    (str) window filter type for signal processing
-                      possible filters:
-                          boxcar, triang, blackman, hamming, hann, bartlett, flattop, parzen,
-                          bohman, blackmanharris, nuttall, barthann, cosine, exponential, tukey,
-                          taylor, lanczos
-                      default: hann
+    nperseg:            (int) Number of data points per segement for signal processing using the window function
 
-    butterworth:      (bool) apply Butterworth Low-Pass filter to the resampled data at
+                            nperseg = 2 ** (nperseg - 1).bit_length()  # number of time steps per segment
+                                                                       # length should be a poweer of 2
+                        default: 4096
 
-                      Possible filters:
-                          low:  apply Butterworth Low-Pass filter at 1.1 of maximum frequency
-                                of the original signal
-                          high: apply Butterworth High-Pass filter at 0.9 of minimum frequecy
-                                of the original signal
-                          band: apply Butterworth Band-Pass filter at 0.9 of minimum frequecy
-                                and 1.1 maximum frequency of the original signal
+    window_filter:      (str) window filter type for signal processing
+                        possible filters:
+                            boxcar, triang, blackman, hamming, hann, bartlett, flattop, parzen,
+                            bohman, blackmanharris, nuttall, barthann, cosine, exponential, tukey,
+                            taylor, lanczos
+                        default: hann
 
-                      default: None
+    butterworth:        (bool) apply Butterworth Low-Pass filter to the resampled data at
 
-    print_input:      (bool) print curves from the *.unv file to screen
-                      default: False
+                        Possible filters:
+                            low:  apply Butterworth Low-Pass filter at 1.1 of maximum frequency
+                                  of the original signal
+                            high: apply Butterworth High-Pass filter at 0.9 of minimum frequecy
+                                  of the original signal
+                            band: apply Butterworth Band-Pass filter at 0.9 of minimum frequecy
+                                  and 1.1 maximum frequency of the original signal
 
-    show_plots:       (bool) if the plots should be shown
-                      default: False
+                        default: None
 
-    show_immediately: (bool) show plots as they come (True) or show all at once at the end (False)
-                      default: False
+    print_input:        (bool) print curves from the *.unv file to screen
+                        default: False
 
-                      if show_plots is False then show_immediately is also False
-    save_plots:       (bool) save plots as *.png, the name of the *.png is taken from the
-                      *.unv file, resulting filename is {unv_path}/{unv_file}_N{node}.png
-                      the locaction of the plot is the same as the *.unv file provided
-                      if show_plots is False, save_plots is automatically set to True
-                      default: True
+    show_plots:         (bool) if the plots should be shown
+                        default: False
+
+    show_immediately:   (bool) show plots as they come (True) or show all at once at the end (False)
+                        default: False
+
+                        if show_plots is False then show_immediately is also False
+    save_plots:         (bool) save plots as *.png, the name of the *.png is taken from the
+                        *.unv file, resulting filename is {unv_path}/{unv_file}_N{node}.png
+                        the locaction of the plot is the same as the *.unv file provided
+                        if show_plots is False, save_plots is automatically set to True
+                        default: True
     """
     # read the UNV file
-    _, _, curves, _ = UNV.read(unv_file)
+    _, _, curves, _ = utils.read(unv_file)
 
     sweep_table = read_sweep_table(sweep_file)
 
@@ -393,20 +685,32 @@ def coherence(unv_file: str, sweep_file: str, sampling_rate: float = 4.,
     if save_plots:
         png_basename = os.path.join(os.path.dirname(os.path.realpath(unv_file)),
                                     os.path.splitext(os.path.basename(unv_file))[0])
+        png_basename += "_" + window_filter
+
         if butterworth:
             png_basename += "_" + butterworth
     else:
         png_basename = None
 
+    # none window == boxcar window
+    if window_filter.lower() == "none":
+        window_filter = "boxcar"
+
     # butterworth filter frequency multipliers
     bl = 0.9
     bh = 1.1
+
+    # containters for *.post output
+    signal_data = {}
+    signal_resampled = {}
+    psd_data = {}
+    coherence_data = {}
 
     print(I("Sweep Table:"))
     print("    +------------+------------+")
     print("    | Freq. [Hz] |  Time [s]  |")
     print("    +------------+------------+")
-    for f, t in sweep_table.items():
+    for f, t in sweep_table:
         print(f"    | {f:10.3E} | {t:10.3E} |")
     print("    +------------+------------+")
 
@@ -418,55 +722,48 @@ def coherence(unv_file: str, sweep_file: str, sampling_rate: float = 4.,
                 print(f"       {node = } {vector}")
 
     # get the frequencies, nodes, driving node and shaker direction
-    freq = np.array(list(sorted(list(curves.keys()))), dtype=float)
-    time = np.interp(freq, np.array(list(sweep_table.keys()), dtype=float),
-                           np.array(list(sweep_table.values()), dtype=float))
-    nodes = list(sorted([node for  node in curves[freq[0]].keys()]))
-    steuernode = nodes.pop(0)    # driving node has to have lowes number
-    shakerdir = [i for i in range(3) if curves[freq[0]][steuernode][i].real != 0.0][0]
+    # TODO:
+    # discard data not in sweep table
+    allfreq, alltime, nodes, steuernode = frequency_time_nodes(curves, sweep_table)
 
-    print(I(f"Processing Driving Node: {steuernode:n},{DIRS[shakerdir]:s}"))
+    # get driving node and shaker direction
+    stsignal = np.array([curves[f][steuernode] for f in allfreq if steuernode in curves[f].keys()], dtype=complex)
+    shakerdir = int(np.where(np.sum(stsignal.real, axis=0) != 0.)[0][0]) # the only nonzero component
 
-    # transform into time domain
-    print(N(f"Transforming {steuernode:n} to time domain.", 4))
-
-    # driving signal in frequency domain
-    stsignal = np.array([curves[f][steuernode][shakerdir] for f in freq], dtype=complex)
-
-    # prepare for resampling to uniform spaced time
     print(N(f"Preparing data for resampling to time domain", 4))
-    sampling_frequency = freq[-1] * sampling_rate
-    dt = 1 / sampling_frequency
-    time_r = np.linspace(time[0], time[-1], int((time[-1] - time[0]) * sampling_frequency) + 1)
-    freq_r = np.interp(time_r,
-                       np.array(list(sweep_table.values()), dtype=float),
-                       np.array(list(sweep_table.keys()), dtype=float))
+    # get time bounds
+    mint = max(np.min(sweep_table, axis=0)[1], np.min(alltime))
+    maxt = min(np.max(sweep_table, axis=0)[1], np.max(alltime))
 
-    # resample to uniform spaced time
-    stsignal_r = resample(time, freq, time_r, freq_r, stsignal, sampling_frequency,
-                          f"Driving Node {steuernode:n},{DIRS[shakerdir]:s}", offset=4)
+    # get time and frequency values for resampling
+    sampling_frequency = allfreq[-1] * sampling_rate
+    time_r = np.linspace(mint, maxt, int((maxt - mint) * sampling_frequency) + 1)
+    freq_r = np.interp(time_r, sweep_table[:,1].flatten(), sweep_table[:,0].flatten())
 
-    # apply butterworth filter if requested
-    if butterworth == "low":
-        stsignal_r = butterworth_lowpass_filter(stsignal_r, fs = sampling_frequency,
-                                                cutoff = bh * freq[-1], offset = 4)
-    elif butterworth == "high":
-        stsignal_r = butterworth_highpass_filter(stsignal_r, fs=sampling_frequency,
-                                                 cutoff = bl * freq[0], offset = 4)
-    elif butterworth == "band":
-        stsignal_r = butterworth_bandpass_filter(stsignal_r, fs = sampling_frequency,
-                                                 lowcut = bl * freq[0], highcut = bh * freq[-1], offset = 4)
+    # number of segments for PSD and Coherence
+    # nperseg = NEXT_POW2(time_r.shape[0] // number_of_segments)
+    nperseg = NEXT_POW2(nperseg)
+    png_basename += f"_{nperseg:06n}"
 
-    # create PSD
-    nperseg = NEXT_POW2(stsignal_r.shape[0] // 1000)
+    # process driving node
+    stfreq, stsignal, stsignal_r, fxx, Pxx = process_signal(tr =          time_r,
+                                                            fr =          freq_r,
+                                                            data =        curves,
+                                                            allfreq =     allfreq,
+                                                            node =        steuernode,
+                                                            dir =         shakerdir,
+                                                            fs =          sampling_frequency,
+                                                            butterworth = butterworth,
+                                                            lf =          bl,
+                                                            hf =          bh,
+                                                            window =      window_filter,
+                                                            nperseg =     nperseg)
 
-    print(N(f"Creating {steuernode:n},{DIRS[shakerdir]:s} PSD", 4))
-    print(N(f"Filter Window: {window_filter:s}", 6))
-    print(N(f"Segment Length: {nperseg:n}", 6))
-
-    fxx, Pxx = scipy.signal.welch(stsignal_r, sampling_frequency, window=window_filter, nperseg=nperseg)
-    Pxx = Pxx[fxx <= freq_r[-1]]
-    fxx = fxx[fxx <= freq_r[-1]]
+    # store for export
+    signal_data = add_curve(signal_data, steuernode, shakerdir * 2,     stfreq, stsignal.real, 6)
+    signal_data = add_curve(signal_data, steuernode, shakerdir * 2 + 1, stfreq, stsignal.imag, 6)
+    signal_resampled = add_curve(signal_resampled, steuernode, shakerdir, time_r, stsignal_r, 4)
+    psd_data = add_curve(psd_data, steuernode, shakerdir, fxx, Pxx)
 
     # plot driving node
     titles = ["Original Signal", "Resampled Signal", "PSD of Resampled Signal"]
@@ -474,157 +771,122 @@ def coherence(unv_file: str, sweep_file: str, sampling_rate: float = 4.,
     yaxis = ["acceleration [mm/s2]", "acceleration [mm/s2]", "PSD mm2/s4"]
 
     png = f"{png_basename:s}_N{steuernode:n}.png" if png_basename is not None else None
-    x = [[freq, time_r, fxx]]
+    x = [[stfreq, time_r, fxx]]
     y = [[stsignal.real, stsignal_r, Pxx]]
     labels = [[f"Driving Node {steuernode:n},{DIRS[shakerdir]:s}"] * 3]
-    plot_multiple(x, y, labels, titles, xaxis, yaxis,
-                  plot_title = f"Driving Node {steuernode:n},{DIRS[shakerdir]:s}",
-                  show_immediately = show_immediately, save = png, offset = 4)
-
+    plot_multiple_rows(x, y, labels, titles, xaxis, yaxis,
+        plot_title = f"Driving Node {steuernode:n},{DIRS[shakerdir]:s}",
+        show_immediately = show_immediately, save = png, offset = 4)
 
     # prepare plot headers
     titles = ["Original Signal", "Resampled Signal", "PSD of Resampled Signal", "Coherence of Resampled Signal"]
     xaxis = ["frequency [Hz]", "time [s]", "frequency [Hz]", "frequency [Hz]"]
     yaxis = ["acceleration [mm/s2]", "acceleration [mm/s2]", "PSD [mm2/s4]", "Coherence [-]"]
+    xlim = [None, None, None, None]
+    ylim = [None, None, None, [-0.05, 1.05]]
 
     for i, node in enumerate(nodes):
-        # prepare plot containers
-        x = [[freq, None, fxx, None]]
+        # prepare plot containers - first data the driving signal
+        x = [[stfreq, None, fxx, None]]
         y = [[stsignal.real, None, Pxx, None]]
+        anno = [[None, None, None, None]]
         labels = [[f"Driving Node {steuernode:n},{DIRS[shakerdir]:s}", None,
                    f"Driving Node {steuernode:n},{DIRS[shakerdir]:s}", None]]
 
+        raumvector = np.zeros(time_r.shape, dtype=float)
         for dir in range(3):
-            print(I(f"Processing Node {node:n},{DIRS[dir]:s}", 0))
+            # process driving node
 
-            # original signal
-            signal = np.array([curves[f][node][dir] for f in freq], dtype=complex)
+            # TODO:
+            # ? Raumvector ?
+            freq, signal, signal_r, fyy, Pyy = process_signal(tr =          time_r,
+                                                              fr =          freq_r,
+                                                              data =        curves,
+                                                              allfreq =     allfreq,
+                                                              node =        node,
+                                                              dir =         dir,
+                                                              fs =          sampling_frequency,
+                                                              butterworth = butterworth,
+                                                              lf =          bl,
+                                                              hf =          bh,
+                                                              window =      window_filter,
+                                                              nperseg =     nperseg)
 
-            # resampled signal
-            signal_r = resample(time, freq, time_r, freq_r, signal, sampling_frequency,
-                                f"Node {node:n},{DIRS[dir]:s}", offset=4)
+            raumvector += signal_r ** 2
 
-            # apply butterworth filter if requested
-            if butterworth == "low":
-                signal_r = butterworth_lowpass_filter(signal_r, fs = sampling_frequency,
-                                                      cutoff = bh * freq[-1], offset = 4)
-            elif butterworth == "high":
-                signal_r = butterworth_highpass_filter(signal_r, fs = sampling_frequency,
-                                                       cutoff = bl * freq[0], offset = 4)
-            elif butterworth == "band":
-                signal_r = butterworth_bandpass_filter(signal_r, fs = sampling_frequency,
-                                                       lowcut = bl * freq[0], highcut = bh * freq[-1], offset = 4)
-
-            # PSD
-            print(N(f"Creating {node:n},{DIRS[dir]:s} PSD", 4))
-            print(N(f"Filter Window: {window_filter:s}", 6))
-            print(N(f"Segment Length: {nperseg:n}", 6))
-
-            fyy, Pyy = scipy.signal.welch(signal_r, sampling_frequency, window=window_filter,
-                                          nperseg=nperseg)
-            Pyy = Pyy[fyy < freq_r[-1]]
-            fyy = fyy[fyy < freq_r[-1]]
+            # store for export
+            signal_data = add_curve(signal_data, node, dir * 2,     freq, signal.real, 6)
+            signal_data = add_curve(signal_data, node, dir * 2 + 1, freq, signal.imag, 6)
+            signal_resampled = add_curve(signal_resampled, node, dir, time_r, signal_r, 4)
+            psd_data = add_curve(psd_data, node, dir, fyy, Pyy)
 
             # Coherence
-            print(N(f"Creating {node:n},{DIRS[dir]:s} Coherence", 4))
+            fxy, Cxy, peaks = create_coherence(node = node,
+                                               dir = dir,
+                                               sx = stsignal_r,
+                                               sy = signal_r,
+                                               f = freq_r,
+                                               fs = sampling_frequency,
+                                               window = window_filter,
+                                               nperseg = nperseg)
 
-            fxy, Cxy = scipy.signal.coherence(stsignal_r, signal_r, fs=sampling_frequency, window=window_filter,
-                                            nperseg=nperseg)
-            Cxy = Cxy[fxy <= freq[-1]]
-            fxy = fxy[fxy <= freq[-1]]
-            cmax = np.max(Cxy)
-            cmin = np.min(Cxy)
-            print(N(f"Maximum up to {fxy[-1]:.2f} Hz: {cmax:.2f}", 6))
-            print(N(f"Minimum up to {fxy[-1]:.2f} Hz: {cmin:.2f}", 6))
+            # save Coherence to a dict for *.post output
+            coherence_data = add_curve(coherence_data, node, dir, fxy, Cxy, 4)
 
             x.append([freq, time_r, fyy, fxy])
             y.append([signal.real, signal_r, Pyy, Cxy])
+            anno.append([None, None, None, peaks])
             labels.append([f"Node {node:n},{DIRS[dir]:s}"] * 4)
 
 
-        png = f"{png_basename:s}_N{node:n}.png" if png_basename is not None else None
-        plot_multiple(x, y, labels, titles, xaxis, yaxis,
-                      plot_title=f"{unv_file:s}: Driving Node {steuernode:n},{DIRS[shakerdir]:s} vs. Node {node:n}",
-                      show_immediately = show_immediately, save = png, offset = 4)
 
+        png = f"{png_basename:s}_N{node:n}.png" if png_basename is not None else None
+        plot_multiple_rows(x=x, y=y, labels=labels, titles=titles, xaxis=xaxis, yaxis=yaxis,
+            plot_title=f"{os.path.basename(unv_file):s}: Driving Node {steuernode:n},{DIRS[shakerdir]:s} vs. Node {node:n}",
+            annotation=anno, xlim=xlim, ylim=ylim, show_immediately=show_immediately, save=png, offset=4)
+
+
+
+        # Signal Raumvector
+        print(I(f"Processing Resampled Raumvector for node {node:n}.", 0))
+        raumvector = raumvector ** (0.5)
+        signal_resampled = add_curve(signal_resampled, node, 3, time_r, raumvector, 4)
+
+        # Coherence Raumvector
+        fxy, Cxy, peaks = create_coherence(node = node,
+                                           dir = dir,
+                                           sx = np.abs(stsignal_r),
+                                           sy = raumvector,
+                                           f = freq_r,
+                                           fs = sampling_frequency,
+                                           window = window_filter,
+                                           nperseg = nperseg)
+        # save Coherence to a dict for *.post output
+        coherence_data = add_curve(coherence_data, node, 3, fxy, Cxy, 4)
+
+
+
+    # write result to *.post file
+    write_post(f"{png_basename:s}_signal.post", signal_data, abscissae = "Frequency [Hz]",
+               dattype = ["AMPLITUDE", "PHASE", "AMPLITUDE", "PHASE", "AMPLITUDE", "PHASE"],
+               result_type = ["Acceleration [mm/s2]", "PHASE [rad]",
+                              "Acceleration [mm/s2]", "PHASE [rad]",
+                              "Acceleration [mm/s2]", "PHASE [rad]"],
+               curve = ["Xreal", "Ximag", "Yreal", "Yimag", "Zreal", "Zimag"])
+    write_post(f"{png_basename:s}_resampled.post", signal_resampled, abscissae = "Time [s]",
+               result_type = "Acceleration [mm/s2]",
+               curve = ["X", "Y", "Z", "R"])
+    write_post(f"{png_basename:s}_Pxx.post", psd_data, abscissae = "Frequency [Hz]",
+               result_type = "PSD [mm2/s4]")
+    write_post(f"{png_basename:s}_Cxy.post", coherence_data, abscissae = "Frequency [Hz]",
+               result_type = "Coherence [-]",
+               curve = ["X", "Y", "Z", "R"])
+
+
+
+    # show plots if selected
     if (not show_immediately) and show_plots:
         plt.show()
-
-
-
-def coherence_directly(unv_file: str, sweep_table: dict, sampling_rate: float,
-                       window_filter: str = "hann",
-                       print_input: bool = False, show_immediately: bool = False):
-    """
-    unv_file: (str) path to *.unv file with results
-    steuernode: (int) number of the driving node
-    shakerdir:  (str) shaker DOF direction x / y / z
-    """
-    # read the UNV file
-    _, _, curves, _ = UNV.read(unv_file)
-
-    print(I("Sweep Table:"))
-    print("    +------------+------------+")
-    print("    | Freq. [Hz] |  Time [s]  |")
-    print("    +------------+------------+")
-    for f, t in sweep_table.items():
-        print(f"    | {f:10.3E} | {t:10.3E} |")
-    print("    +------------+------------+")
-
-    # print read results
-    if print_input:
-        for frequency, curve in curves.items():
-            print(f"[+] {frequency = }")
-            for node, vector in curve.items():
-                print(f"       {node = } {vector}")
-
-    # get the frequencies, nodes, driving node and shaker direction
-    freq = np.array(list(sorted(list(curves.keys()))), dtype=float)
-    freq_step = freq[1:] - freq[:-1]
-    fs = freq_step[0]
-
-    time = np.interp(freq, np.array(list(sweep_table.keys()), dtype=float),
-                           np.array(list(sweep_table.values()), dtype=float))
-    time_step = time[1:] - time[:-1]
-
-    nodes = list(sorted([node for  node in curves[freq[0]].keys()]))
-    steuernode = nodes.pop(0)    # driving node has to have lowes number
-    shakerdir = [i for i in range(3) if curves[freq[0]][steuernode][i].real != 0.0][0]
-    stsignal = np.array([curves[f][steuernode][shakerdir] for f in freq], dtype=complex)
-
-    nperseg = NEXT_POW2(stsignal.shape[0] // 100)
-    fxx, Pxx = scipy.signal.welch(stsignal.real, fs=1/fs, window=window_filter, nperseg=128)
-
-    print(I(f"Processing Driving Node: {steuernode:n},{DIRS[shakerdir]:s}"))
-    # prepare plot headers
-    titles = ["Original Signal", "PSD", "Coherence"]
-    xaxis = ["frequency [Hz]", "1/frequency [1/Hz]", "1/frequency [1/Hz]"]
-    yaxis = ["acceleration [mm/s2]", "PSD [mm2/s4]", "Coherence [-]"]
-    for i, node in enumerate(nodes):
-        x = [[freq, fxx, None]]
-        y = [[stsignal.real, Pxx.real, None]]
-        labels = [[f"Driving Node {steuernode:n},{DIRS[shakerdir]:s}",
-                   f"Driving Node {steuernode:n},{DIRS[shakerdir]:s}", None]]
-        for dir in range(3):
-            signal = np.array([curves[f][node][dir] for f in freq], dtype=complex)
-            fyy, Pyy = scipy.signal.welch(signal.real, fs=1/fs, window=window_filter, nperseg=128)
-
-            fxyp, Pxy = scipy.signal.csd(stsignal.real, signal.real, fs=1/fs, window=window_filter, nperseg=128)
-
-            fxyc, Cxy = scipy.signal.coherence(stsignal.real, signal.real, fs=1/fs, window=window_filter, nperseg=128)
-
-            x.append([freq, fxyp, fxyc])
-            y.append([signal.real, Pxx.real, Cxy])
-            labels.append([f"Node {node:n},{DIRS[dir]:s}", f"Node {node:n},{DIRS[dir]:s} PSD", f"Node {node:n},{DIRS[dir]:s}"])
-
-            x.append([None, fxyc, None])
-            y.append([None,  Pxy.real, None])
-            labels.append([None, f"Node {node:n},{DIRS[dir]:s} CSD", None])
-
-        plot_multiple(x, y, labels, titles, xaxis, yaxis,
-                      f"{unv_file:s}: Driving Node {steuernode:n},{DIRS[shakerdir]:s} vs. Node {node:n}",
-                      show_immediately)
-    plt.show()
 
 
 
@@ -655,9 +917,18 @@ possible filters:
     bohman, blackmanharris, nuttall, barthann, cosine, exponential, tukey,
     taylor, lanczos
 
-see help for scipy.signal.get_window() for more info.
+see help for scipy.signal.get_window() for more info. none == boxcar
 
 default: hann
+
+""")
+
+    parser.add_argument("-n", "--number_of_points_per_segment", dest="nperseg", type=int, default=4096,
+                        help="""Number of data points per segment for signal processing using the window function
+
+    nperseg = 2 ** (nperseg - 1).bit_length()  # number of time steps per segment length should be a power of 2
+
+default: 4096
 
 """)
 
@@ -750,19 +1021,23 @@ Example of input for one frequency 12,5 Hz (Dataset 55, Complex Results (5) of n
     # Parse command-line arguments.
     args = parser.parse_args()
 
+    unv_file = os.path.realpath(args.unv_file)
+    sweep_file = os.path.realpath(args.sweep_file)
+
     print(I(f"Started script {__file__:s}", 0))
-    print(N(f"UNV file:           {args.unv_file:s}", 4))
-    print(N(f"Sweep file:         {args.sweep_file:s}", 4))
-    print(N(f"Sampling ratio:     {args.sampling_ratio:<.3f}", 4))
-    print(N(f"Window filter :     {args.window_filter[0].upper() + args.window_filter[1:].lower():s}", 4))
-    print(N(f"Butterworth Filter: {args.butterworth}", 4))
-    print(N(f"Print input:        {args.print_input}", 4))
-    print(N(f"Show plots:         {args.show_plots}", 4))
-    print(N(f"Show immediately:   {args.show_immediately}", 4))
-    print(N(f"Save plots:         {args.save_plots}", 4))
+    print(N(f"UNV file:                 {unv_file:s}", 4))
+    print(N(f"Sweep file:               {sweep_file:s}", 4))
+    print(N(f"Sampling ratio:           {args.sampling_ratio:<.3f}", 4))
+    print(N(f"Number of p. per segment: {args.nperseg:<n}", 4))
+    print(N(f"Window filter :           {args.window_filter[0].upper() + args.window_filter[1:].lower():s}", 4))
+    print(N(f"Butterworth Filter:       {args.butterworth}", 4))
+    print(N(f"Print input:              {args.print_input}", 4))
+    print(N(f"Show plots:               {args.show_plots}", 4))
+    print(N(f"Show immediately:         {args.show_immediately}", 4))
+    print(N(f"Save plots:               {args.save_plots}", 4))
 
 
-    coherence(args.unv_file, args.sweep_file, args.sampling_ratio,
+    coherence(unv_file, sweep_file, args.sampling_ratio, args.nperseg,
               window_filter = args.window_filter.lower(), butterworth = args.butterworth,
               print_input = args.print_input, show_plots = args.show_plots,
               show_immediately = args.show_immediately, save_plots = args.save_plots)
