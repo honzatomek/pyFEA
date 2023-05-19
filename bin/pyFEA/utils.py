@@ -3,7 +3,8 @@ import typing
 import numpy as np
 
 
-_CHARACTERS = list(range(ord("a"), ord("z") + 1)) + [ord("-"), ord("_")]
+_CHARACTERS = list(range(ord("a"), ord("z") + 1)) + [ord("-"), ord("_")] + \
+              list(range(ord("0"), ord("9") + 1))
 
 
 def check_name(name: str) -> str:
@@ -16,7 +17,7 @@ def check_name(name: str) -> str:
     else:
         for char in name[1:]:
             if ord(char.lower()) not in _CHARACTERS:
-                raise ValueError(f"Name contains illegal character '{char:s}' not in [a-zA-Z-_]/")
+                raise ValueError(f"Name contains illegal character '{char:s}' not in [a-zA-Z0-9-_]")
 
         return name.upper()
 

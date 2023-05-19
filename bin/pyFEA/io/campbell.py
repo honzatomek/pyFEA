@@ -55,7 +55,7 @@ CMAP = LinearSegmentedColormap.from_list("Campbell",
 
 
 class UNV:
-   @classmethod
+    @classmethod
     def _readline_in_dataset(cls, file: io.TextIOWrapper, dataset: str) -> str:
         line = file.readline()
         if not line: # EOF
@@ -469,7 +469,8 @@ def plot_campbell(rpm: np.ndarray, freqs: np.ndarray, fft: np.ndarray, maxfreq: 
             line.append(ax.plot((0, rpm_max), (0, (i + 1) * rpm_max / 60.),
                         color="white", lw=1.0, linestyle="dashed"))
 
-    cbar = fig.colorbar(surf, ticks=np.power(10., np.arange(level_min, level_max + 1)))
+    cbar = fig.colorbar(surf, ticks=np.power(10., np.arange(level_min, level_max + 1)),
+                        format="%.1E")
     cbar.set_label(z_label, rotation=90)
 
     fig.suptitle(title)

@@ -41,7 +41,9 @@ class Node:
         return f"<Node {self.id:n}>"
 
     def __str__(self) -> str:
-        return f"Node ID {self.id:n} {str(self.coors):s}"
+        # return f"Node ID {self.id:n} {str(self.coors):s}"
+        # return f"{self.id:9n} {self.defsys:9n} {self.outsys:9n} {self.X:13.5f} {self.Y:13.5f} {self.Z:13.5f}"
+        return f"{self.id:9n} {self.X:13.5f} {self.Y:13.5f} {self.Z:13.5f}"
 
     @property
     def id(self) -> int:
@@ -75,7 +77,12 @@ class Node:
     def coors(self, coors):
         if len(coors) < 3:
             coors = list(coors) + [0.] * (3 - len(coors))
-        self._coors = np.array(coors, dtype=float)
+
+        elif type(coors) is np.ndarray:
+            self._coors = coors
+
+        else:
+            self._coors = np.array(coors, dtype=float)
 
     @property
     def X(self) -> float:
@@ -104,55 +111,80 @@ class Node:
 
 
 class Nodes:
-    def __init__(self, nodes: [dict, list]):
+    def __init__(self, nodes: [dict, list] = None):
         self._nodes = {}
-        self.nodes = nodes
+
+        if nodes is not None:
+            self.add(nodes)
 
     def __repr__(self) -> str:
         return f"<Nodes count: {len(self):n}>"
 
     def __str__(self) -> str:
-        ids = list(self.keys())
-        return f"Elements count: {len(self):9n}, min ID: {min(ids):9n}, max ID: {max(ids):9n}"
+        # ids = list(self.keys())
+        # return f"Nodes count: {len(self):9n}, min ID: {min(ids):9n}, max ID: {max(ids):9n}"
+
+        msg = ""
+        # get defsys
+        defsys = {}
+        for nid, node in self:
+            if node.defsys not in defsys.keys():
+                defsys.setdefault(node.defsys, [])
+            defsys[node.defsys].append(nid)
+
+        for defsys, nodes in defys.items():
+            if defsys == 0:
+                continue
+            msg += f"$ROTB\n{defsys:9n} :"
+            for i, n in enumerate(nodes):
+                if (i + 1) % 5 == 1:
+                    msg += "\n&          "
+                msg += f" {n:9n}"
+            if not msg.endswith("\n"):
+                msg += "\n"
+
+        msg = "$COOR\n"
+        for nid, node in self:
+            msg += str(node) + "\n"
+        return msg
 
     def __len__(self) -> int:
-        return len(self.nodes)
+        return len(self._nodes)
 
     def __iter__(self) -> (int, Node):
-        for nid, node in self.nodes.items():
+        for nid, node in self._nodes.items():
             yield nid, node
 
     def __getitem__(self, id: int) -> Node:
-        return self.nodes[id]
+        return self._nodes[id]
 
     def __setitem__(self, id: int, node):
-        self.nodes[id] = node
+        self._nodes[id] = node
 
     def __add__(self, nodes):
-        self.nodes = nodes
+        self.add(nodes)
         return self
 
     def keys(self) -> int:
-        return self.nodes.keys()
+        return self._nodes.keys()
 
     def values(self) -> Node:
-        return self.nodes.values()
+        return self._nodes.values()
 
     def items(self) -> (int, Node):
-        return self.nodes.items()
+        return self._nodes.items()
 
-    @property
-    def nodes(self) -> dict:
-        return self._nodes
-
-    @nodes.setter
-    def nodes(self, nodes: [list | Node]):
+    def add(self, nodes: [list | Node]):
         if type(nodes) is Node:
             self._nodes.setdefault(nodes.id, nodes)
 
+        elif type(nodes) is type(self):
+            for nid, node in nodes.items():
+                self._nodes.setdefault(nid, node)
+
         elif type(nodes) is list:
             for node in nodes:
-                self.nodes = node
+                self.add(node)
 
         else:
             raise TypeError(f"Cannot add Nodes ({str(nodes):s}).")
@@ -268,9 +300,10 @@ class CYL(CoordinateSystem):
 
 
 class CoordinateSystems:
-    def __init__(self, csys: [dict, list]):
+    def __init__(self, csys: [dict, list] = None):
         self._csys = {}
-        self.csys = csys
+        if csys is not None:
+            self.csys = csys
 
     def __repr__(self) -> str:
         return f"<Coordinate Systems count:{len(self):n}>"
@@ -524,9 +557,10 @@ class PYRA12(Element):
 
 
 class Elements:
-    def __init__(self, elements: [dict, list]):
+    def __init__(self, elements: [dict, list] = None):
         self._elements = {}
-        self.elements = elements
+        if not elements is None:
+            self.elements = elements
 
     def __repr__(self) -> str:
         return f"<Elements count:{len(self):n}>"
@@ -580,7 +614,7 @@ class Elements:
 
 
 class Structure:
-    def __init__(self, name: str = _DEFAULT_STRUCTURE, **kwargs):
+    def __init__(self, name: str, **kwargs):
         self.name = name
         self._nodes = Nodes()
         self._elements = Elements()
@@ -858,7 +892,7 @@ class Assign:
 
 
 class System:
-    def __init__(self, name: str = _DEFAULT_SYSTEM, **kwargs):
+    def __init__(self, name: str, **kwargs):
         self._properties = {}
         self._assignments = {}
 
@@ -971,8 +1005,10 @@ class Constraint:
 
 
 class Constraints:
-    def __init__(self, name: str = _DEFAULT_CONSTRAINTS, **kwargs):
+    def __init__(self, name: str, **kwargs):
         self._nodal = {}
+
+        self.name = name
 
         for key, value in kwargs.items():
             if key == "nodal":
@@ -1098,7 +1134,7 @@ class Prescribed:
 
 
 class Loading:
-    def __init__(self, name: str = _DEFAULT_LOADING, **kwargs):
+    def __init__(self, name: str, **kwargs):
         self._nodal = {}
         self._prescribed = {}
 
@@ -1159,9 +1195,11 @@ class Loading:
 
 
 class Results:
-    def __init__(self, name: str = _DEFAULT_RESULTS, **kwargs):
+    def __init__(self, name: str, **kwargs):
         self._nodal = {}
         self._elemental = {}
+
+        self.name = name
 
         for key, value in kwargs.items():
             if key == "nodal":
@@ -1275,32 +1313,32 @@ class Component:
         if "situation" in kwargs.keys():
             self.situation = Situation(kwargs["situation"])
         else:
-            self.situation = Situation()
+            self.situation = Situation(_DEFAULT_SITUATION)
 
         if "structure" in kwargs.keys():
             self.structure = Structure(kwargs["structure"])
         else:
-            self.structure = Structure()
+            self.structure = Structure(_DEFAULT_STRUCTURE)
 
         if "system" in kwargs.keys():
             self.system = System(kwargs["system"])
         else:
-            self.system = System()
+            self.system = System(_DEFAULT_SYSTEM)
 
         if "constraints" in kwargs.keys():
             self.constraints = Constraints(kwargs["constraints"])
         else:
-            self.constraints = Constraints()
+            self.constraints = Constraints(_DEFAULT_CONSTRAINTS)
 
         if "loading" in kwargs.keys():
             self.loading = Loading(kwargs["loading"])
         else:
-            self.loading = Loading()
+            self.loading = Loading(_DEFAULT_LOADING)
 
         if "results" in kwargs.keys():
             self.results = Results(kwargs["results"])
         else:
-            self.results = Results()
+            self.results = Results(_DEFAULT_RESULTS)
 
 
     def __repr__(self) -> str:
@@ -1338,7 +1376,7 @@ class Component:
             return self._situation[name]
 
     @property
-    def structure(self) -> Structure:
+    def structure(self) -> dict:
         return self._structure
 
     @structure.setter
@@ -1507,7 +1545,7 @@ class Materials:
                 self.add(material)
 
         elif type(materials) is dict:
-            self.add(Material(**materials)
+            self.add(Material(**materials))
 
         else:
             raise TypeError(f"Wrong type of materials {type(materials).__name__:s}.")
