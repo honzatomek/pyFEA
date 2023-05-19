@@ -14,6 +14,7 @@ import gzip
 import argparse
 import warnings
 import numpy as np
+import scipy.interpolate
 import scipy.signal
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -22,6 +23,11 @@ from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 
 sys.path.append('.')
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+
+# import utils
+# from utils import UNV
+
+FIGSIZE = (12, 8)
 
 warnings.filterwarnings("ignore")
 NEXT_POW2 = lambda x: int(1 if x == 0 else 2 ** (x - 1).bit_length())
@@ -54,9 +60,11 @@ CMAP = LinearSegmentedColormap.from_list("Campbell",
                                          N=256)
 
 
+
 class UNV:
     @classmethod
     def _readline_in_dataset(cls, file: io.TextIOWrapper, dataset: str) -> str:
+        """read one line from dataset"""
         line = file.readline()
         if not line: # EOF
             raise IOError(f'[-] File {file.name:s} ended before end of dataset {dataset:s}')
@@ -67,6 +75,8 @@ class UNV:
 
     @classmethod
     def _process_line(cls, line: str, field_formats: list) -> list:
+        """process string based on list of formats - automatically split line into
+        fields of correct length and of correct type"""
         start = 0
         result = []
         for fmt in field_formats:
@@ -99,7 +109,8 @@ class UNV:
 
 
     @classmethod
-    def _read_function_at_ndof(cls, file: io.TextIOWrapper,  results: dict = None) -> dict:
+    def _read_dataset_58(cls, file: io.TextIOWrapper,  results: dict = None) -> dict:
+        """read dataset 58 - Function at NDOF"""
         if results is None:
             results = {}
 
@@ -237,19 +248,23 @@ class UNV:
         ordinate = ordinate_numerator_datachar['axis_label']
         ordinate_units = ordinate_numerator_datachar['axis_units_label']
 
-        results = {'x': {'label': abscissa,
-                         'units': abscissa_units,
-                         'values': np.array(x, dtype=float)},
-                   'y': {'label': ordinate,
-                         'units': ordinate_units,
-                         'values': np.array(y, dtype=type(y[0]))},
-                   'node': dof_identification['resp_node'],
-                   'dir': dof_identification['resp_dir'],}
-        return {data_set: results}
+        results[data_set] = {'x': {'label': abscissa,
+                                   'units': abscissa_units,
+                                   'values': np.array(x, dtype=float)
+                                  },
+                             'y': {'label': ordinate,
+                                   'units': ordinate_units,
+                                   'values': np.array(y, dtype=type(y[0]))
+                                  },
+                             'node': dof_identification['resp_node'],
+                             'dir': dof_identification['resp_dir'],
+                            }
+        return results
 
 
     @classmethod
     def read(cls, filename: str) -> dict:
+        """reads *.unv file"""
         if os.path.isfile(filename):
             if filename.lower().endswith('.gz'):
                 file = gzip.open(filename, 'rt')
@@ -274,7 +289,7 @@ class UNV:
                     dataset = line.strip()
                     if dataset == '58':
                         file.seek(last_pos)
-                        results.update(cls._read_function_at_ndof(file, results))
+                        results.update(cls._read_dataset_58(file, results))
 
                     else:
                         print(f'[!] Skipping dataset {dataset:s}')
@@ -300,8 +315,41 @@ class UNV:
 
 
 
-def fft_window(signal: np.ndarray, wlen: int,
-               dt: float = None, window: str = "hann") -> (np.ndarray, np.ndarray):
+def butterworth_lowpass_filter(signal_name: str, signal: np.ndarray,
+                               fs: float, cutoff: float) -> np.ndarray:
+    """Butterworth Lowpass filter
+
+    Args:
+        signal_name (str):   name of the signal data
+        signal (np.ndarray): signal to filter
+        fs (float):          sample rate [Hz]
+        cutoff (float):      desired cutoff frequency of the filter,
+                             slightly higher than the desired one
+    """
+
+    print(f"[+] Applying Butterworth Low-Pass Filter to signal {signal_name:s}")
+    print(f"      Frequency: {cutoff:.2f} Hz")
+
+    n = signal.shape[0]
+    T = n / fs
+    nyq = 0.5 * fs  # Nyquist frequency
+    order = 2       # quadratic sine wave representation
+
+    # normalise the frequency
+    normal_cutoff = cutoff / nyq
+
+    # get the filter coefficients
+    b, a     = scipy.signal.butter(N = order, Wn = normal_cutoff, btype = 'lowpass', analog = False)
+
+    # filter the signal
+    signal_f = scipy.signal.filtfilt(b, a, signal)
+
+    return signal_f
+
+
+
+def fft_window(signal: np.ndarray, wlen: int, dt: float = None,
+               window: str = "hann", remove_mean: bool = True) -> (np.ndarray, np.ndarray):
     """Perform FFT Analysis of a signal with window function
 
     Args:
@@ -309,40 +357,48 @@ def fft_window(signal: np.ndarray, wlen: int,
         wlen (int):          window length (should be power of 2)
         dt (float):          time increment of the signal
         window (str):        name of window function (default: hann)
+        remove_mean (bool):  perform mean removal before FFT
 
     Returns:
         (np.ndarray, np.ndarray): frequencies, fft of the signal
     """
 
+    # prepare window function (periodic)
     if window is not None:
         window_func = scipy.signal.get_window(window, signal.shape[0], True)
     else:
         window_func = np.array([1.] * signal.shape[0], dtype=float)
 
     # mean removal
-    avg = np.mean(signal)
+    if remove_mean:
+        windowed_signal = (signal - np.mean(signal)) * window_func
+    else:
+        windowed_signal = signal * window_func
 
-    windowed_signal = (signal - avg) * window_func
+    # append zeros to the end of the signal if needed to force all signals to same length
     if windowed_signal.shape[0] < wlen:
         windowed_signal = np.hstack((windowed_signal, [0.] * (wlen - windowed_signal.shape[0])))
 
+    # time step
     if dt is None:
         dt = 1
         t = np.arange(0, windowed_signal.shape[0])
     else:
         t = np.arange(0, windowed_signal.shape[0]) * dt
 
+    # make signal of even length
     if windowed_signal.shape[0] % 2 != 0:
         t = t[0:-1]
         windowed_signal = windowed_signal[:-1]
 
-    # Nyquist frequency
+    # Nyquist frequency for even sampled data
     nyq = 0.5 * windowed_signal.shape[0]
 
     # divide by Nyquist frequency for coherent magnitude
     signalFFT = np.fft.fft(windowed_signal) / nyq
     freqsFFT = np.fft.fftfreq(windowed_signal.shape[0], d=dt)
 
+    # store only positive frequencies
     firstNegIdx = np.argmax(freqsFFT < 0)
     freqsFFTpositive = freqsFFT[:firstNegIdx]
     signalFFTpositive = signalFFT[:firstNegIdx]
@@ -362,54 +418,18 @@ def plot_lines(signals: dict, savefig: str = None):
                                                   label: str,
                                                   units: str}}}
     """
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=FIGSIZE)
     for sid, signal in signals.items():
         ax.plot(signal["x"]["values"], signal["y"]["values"], label=f"Dataset: {str(sid):s}")
     ax.set_xlabel(f"{signal['x']['label']:s} [{signal['x']['units']:s}]")
     ax.set_ylabel(f"{signal['y']['label']:s} [{signal['y']['units']:s}]")
     ax.legend()
+    fig.suptitle(signal["y"]["label"] + " Time series")
+    fig.canvas.set_window_title(signal["y"]["label"] + " Time series")
 
     if savefig is not None:
-        print(f"[+] Saving line plot {savefig:s}")
+        print(f"[+] Saving line plot: {savefig:s}")
         fig.savefig(savefig)
-
-
-
-def campbell(signal: np.ndarray, rpm_signal: np.ndarray, window: str = "hann",
-             window_len: int = 4096, overlap = 0.25) -> (np.ndarray, np.ndarray, np.ndarray):
-    """Process signal data for Campbell Rainflow Diagram using windowed FFT
-    Analysis with overlapping.
-
-    Args:
-        signal (np.ndarray):     signal array [[time, value]]
-        rpm_signal (np.ndarray): RPM array [[time, rpm]]
-        window (str):            name of a window function to use
-        window_len (int):        number of segments for processing (default = 4096)
-        overlap (float):         fraction of the window length to use for overlapping
-                                 windows
-
-    Returns:
-        (np.ndarray, np.ndarray, np.ndarry): (rpm vector, frequency vector, FFT array)
-    """
-
-    RPM = []
-    FFT = []
-    for i in range(0, signal.shape[0], int((1. - overlap) * window_len)):
-        end = i + window_len if i + window_len <= signal.shape[0] else signal.shape[0]
-        RPM.append(np.mean(rpm_signal[i:end,1]))
-        time = signal[i:end,0]
-        fs = 1 / np.mean(time[1:] - time[:-1])
-        freqsFFT, signalFFT = fft_window(signal[i:end,1].flatten(), window_len,
-                                         1. / fs, window)
-        FFT.append(signalFFT)
-
-    RPM = np.array(RPM, dtype=float)
-    idx = np.argsort(RPM)
-    RPM = RPM[idx]
-    # FFT = np.array(FFT, dtype=float)[idx]
-    FFT = np.array(FFT, dtype=float)[idx].T
-
-    return RPM, freqsFFT, FFT
 
 
 
@@ -421,7 +441,7 @@ def plot_campbell(rpm: np.ndarray, freqs: np.ndarray, fft: np.ndarray, maxfreq: 
     Args:
         rpm (np.ndarray):   rpm vector
         freqs (np.ndarray): frequencies vector
-        fft (np.ndarray):   FFT results of the time signal
+        fft (np.ndarray):   FFT results of the time signal (freq as row, rpm as column)
         maxfreq (float):    maximum frequency to plot
         z_label (str):      label of the Campbell diagram Z component
         num_orders (int):   number of motor order lines to plot
@@ -429,21 +449,26 @@ def plot_campbell(rpm: np.ndarray, freqs: np.ndarray, fft: np.ndarray, maxfreq: 
                             if False, X Axis is RPM, Y Axis is Frequency
         savefig (str):      filename to save the plot to
     """
-    print(f"[+] plotting {title:s}")
+    print(f"[+] plotting " + ", ".join(title.split("\n")))
 
     rpm_min = np.min(rpm)
     rpm_max = np.max(rpm)
 
+    # get min index of max frequency to plot
     idx = np.argmin(freqs < maxfreq) + 1
 
-    # zgrid = fft[:,:idx]
+    # reduce the FFT data to only frequencies below max frequency
     zgrid = fft[:idx,:]
+
+    # prepare log levels for colorbar
     level_min = int(np.floor(np.log10(np.min(zgrid))))
     level_max = int(np.floor(np.log10(np.max(zgrid)))) + 1
     levels = np.logspace(level_min, level_max, 35)
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=FIGSIZE)
+    # select x and y axis
     if flip_xy:
+        # x axis is frequency, y axis is rpm
         xgrid, ygrid = np.meshgrid(freqs[:idx], rpm)
         zgrid = zgrid.T
         surf = ax.contourf(xgrid, ygrid, zgrid, levels=levels,
@@ -452,6 +477,7 @@ def plot_campbell(rpm: np.ndarray, freqs: np.ndarray, fft: np.ndarray, maxfreq: 
         ax.set_xlabel("Frequency [Hz]")
         ax.set_ylabel("RPM [1/min]")
     else:
+        # x axis is rpm, y axis is frequency
         xgrid, ygrid = np.meshgrid(rpm, freqs[:idx])
         zgrid = zgrid
         surf = ax.contourf(xgrid, ygrid, zgrid, levels=levels,
@@ -460,6 +486,7 @@ def plot_campbell(rpm: np.ndarray, freqs: np.ndarray, fft: np.ndarray, maxfreq: 
         ax.set_xlabel("RPM [1/min]")
         ax.set_ylabel("Frequency [Hz]")
 
+    # add lines representing motor orders
     line = []
     for i in range(num_orders):
         if flip_xy:
@@ -474,17 +501,175 @@ def plot_campbell(rpm: np.ndarray, freqs: np.ndarray, fft: np.ndarray, maxfreq: 
     cbar.set_label(z_label, rotation=90)
 
     fig.suptitle(title)
+    fig.canvas.set_window_title(", ".join(title.split("\n")))
 
     if savefig is not None:
         print(f"[+] Saving Campbell Diagram: {savefig:s}")
         fig.savefig(savefig)
 
 
+def order_analysis(signal: np.ndarray, rpm: np.ndarray, time: np.ndarray, signal_name: str = None,
+                   window: str = "hann", window_len: int = 4096, overlap: float = 0.5,
+                   remove_mean: bool = True, savefig: str = None) -> (np.ndarray, np.ndarray):
+    """perform order analysis of the signal
+
+    Args:
+        signal (np.ndarray): a vector with signal data
+        rpm (np.ndarray):    a vector with respective rpm data
+        time (np.ndarray):   a vector with respective times
+        signal_name (str):   name of signal for plotting
+        window (str):        name of a window function to use
+        window_len (int):    number of segments for processing (default = 4096)
+        overlap (float):     fraction of the window length to use for overlapping
+                             windows
+        remove_mean (bool):  perform mean removal before FFT
+        savefig (str):       filename to save the plot to
+    """
+    print(f"[+] Performing Order Analysis for {signal_name:s}")
+
+    num_ord = 10
+
+    # time step and sampling frequency
+    dt = np.mean(time[1:] - time[:-1])
+    fs = 1 / dt
+
+    # filter the rpm a bit to eliminate errors
+    butterworth = min(fs / 4, np.max(rpm) / 60. * num_ord)
+    rpm = butterworth_lowpass_filter("RPM", rpm, fs, butterworth)
+
+    # filter the signal
+    signal = butterworth_lowpass_filter(signal_name, signal, fs, butterworth)
+
+    # convert rpm to rotations per time step
+    rpdt = rpm / 60. * dt
+    # integrate to get cummulative rotations
+    rot = np.cumsum(rpdt)
+
+    # sampling step in revolutions (max sampling rate)
+    dr = np.min(rot[1:] - rot[:-1])
+    # create equidistant rotations
+    rot_e = np.arange(np.min(rot), np.max(rot) + dr, dr)
+
+    # resample to equidistant rotations
+    # sig_e = np.interp(rot_e, rot, signal)
+    f = scipy.interpolate.interp1d(rot, signal, kind="cubic",
+                                   bounds_error = False, fill_value="extrapolate")
+    sig_e = f(rot_e)
+
+    # perform FFT
+    # orders, amplitudes = fft_window(sig_e, sig_e.shape[0], dr, None, True)
+    # ax1.plot(orders, amplitudes, label="FFT Analysis")
+    # ax1.set_title((f"{signal_name:s}: " if signal_name is not None else "") + "Order Analysis")
+    # ax1.set_xlabel("Order [-]")
+    # ax1.set_xlim((0., 10.))
+    # ax1.set_xticks(np.arange(1, 11, 1))
+    # ax1.set_ylabel("Velocity [m/s]")
+
+    # perform FFT by windows
+    amplitudes = []
+    for i in range(0, sig_e.shape[0], int((1. - overlap) * window_len)):
+        end = i + window_len if i + window_len <= sig_e.shape[0] else sig_e.shape[0]
+        orders, amp = fft_window(sig_e[i:end].flatten(), window_len, dr, window, True)
+
+        amplitudes.append(amp)
+
+    # plot it
+    fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=FIGSIZE)
+
+    # plot FFT
+    for i in range(len(amplitudes)):
+        ax1.plot(orders, amplitudes[i], label=f"window: {i+1:n}")
+    if signal_name is None:
+        sig_name = "Order Analysis"
+        sig_name += f" (BLP {butterworth:.0f}Hz)" if butterworth > 0. else ""
+    else:
+        sig_name = signal_name
+        sig_name += f", BLP {butterworth:.0f}Hz" if butterworth > 0. else ""
+        sig_name += f", {window:s}, L={window_len:n} ({overlap * 100:.0f}%)"
+        sig_name += ", mean remove" if remove_mean else ""
+        sig_name += ": Order Analysis"
+    ax1.set_title(sig_name)
+    ax1.set_xlabel("Order [-]")
+    ax1.set_xlim((0., num_ord))
+    ax1.set_xticks(np.arange(0, num_ord + 1, 1))
+    ax1.set_ylabel("Velocity [m/s]")
+    # ax1.legend()
+
+    # plot resampled signal
+    ax2.plot(rot, signal, label="Original Signal")
+    ax2.plot(rot_e, sig_e, label="Resampled Signal")
+    if signal_name is None:
+        sig_name = "Signal Resampled to Angle Domain"
+        sig_name += f", BLP {butterworth:.0f}Hz" if butterworth > 0. else ""
+    else:
+        sig_name = signal_name
+        sig_name += f", BLP {butterworth:.0f}Hz" if butterworth > 0. else ""
+        sig_name += ": Resampled to Angle Domain"
+    ax2.set_title(sig_name)
+    ax2.set_xlabel("Rotations [-]")
+    ax2.set_xlim((0., np.max(rot_e)))
+    ax2.set_ylabel("Velocity [m/s]")
+    ax2.legend()
+
+    # fig.suptitle("Order Analysis")
+    fig.canvas.set_window_title(f"{signal_name:s} Order Analysis")
+    fig.tight_layout()
+
+    if savefig is not None:
+        print(f"[+] Saving Order Analysis: {savefig:s}")
+        fig.savefig(savefig)
+
+    return rot_e, sig_e
+
+
+
+def campbell(signal: np.ndarray, rpm_signal: np.ndarray,
+             window: str = "hann", window_len: int = 4096, overlap: float = 0.25,
+             remove_mean: bool = True) -> (np.ndarray, np.ndarray, np.ndarray):
+    """Process signal data for Campbell Rainflow Diagram using windowed FFT
+    Analysis with overlapping.
+
+    Args:
+        signal (np.ndarray):     signal array [[time, value]]
+        rpm_signal (np.ndarray): RPM array [[time, rpm]]
+        window (str):            name of a window function to use
+        window_len (int):        number of segments for processing (default = 4096)
+        overlap (float):         fraction of the window length to use for overlapping
+                                 windows
+        remove_mean (bool):      perform mean removal before FFT
+
+    Returns:
+        (np.ndarray, np.ndarray, np.ndarry): (rpm vector, frequency vector, FFT array)
+    """
+
+    # process signal by segments using window function
+    RPM = []
+    FFT = []
+    # loop over signal by number of segments - overlap * number of segments
+    for i in range(0, signal.shape[0], int((1. - overlap) * window_len)):
+        end = i + window_len if i + window_len <= signal.shape[0] else signal.shape[0]
+        RPM.append(np.mean(rpm_signal[i:end,1]))
+        time = signal[i:end,0]
+        fs = 1 / np.mean(time[1:] - time[:-1])
+        freqsFFT, signalFFT = fft_window(signal[i:end,1].flatten(), window_len,
+                                         1. / fs, window, remove_mean)
+        FFT.append(signalFFT)
+
+    # sort the results in ascending order of rpm
+    RPM = np.array(RPM, dtype=float)
+    idx = np.argsort(RPM)
+    RPM = RPM[idx]
+    FFT = np.array(FFT, dtype=float)[idx].T
+
+    return RPM, freqsFFT, FFT
+
+
 
 def create_campbell_diagram(filename: str, window: str = "hann", window_length: int = 4096,
                             window_overlap: float = 0.25, max_freq: float = 500.,
-                            flip_xy: bool = False, num_orders: int = 3, showfig: bool = False,
-                            savefig: bool = False):
+                            butterworth: float = -1., remove_mean: bool = True,
+                            flip_xy: bool = False, num_orders: int = 3,
+                            showfig: bool = False, savefig: bool = False):
     """read *.unv file and create a Campbell diagram for each dataset 58 found inside
 
     Args:
@@ -494,6 +679,9 @@ def create_campbell_diagram(filename: str, window: str = "hann", window_length: 
         window_overlap (float):  fraction of the window length to use for overlapping
                                  windows
         max_freq (float):        maximum frequency to plot
+        butterworth (float):     if > 0. apply Butterworth Lowpass Filter to the signals
+                                 before processing them
+        remove_mean (bool):      perform mean removal before FFT
         flip_xy (bool):          if True, X Axis is Frequency, Y Axis is RPM
                                  if False, X Axis is RPM, Y Axis is Frequency
         num_orders (int):        number of motor order lines to plot
@@ -501,44 +689,89 @@ def create_campbell_diagram(filename: str, window: str = "hann", window_length: 
         savefig (bool):          save plots to file
     """
 
+    # read data
     print(f"[+] creating Campbell Diagram for {filename:s}")
     results = UNV.read(filename)
 
+    # prepare signals
     rpm = None
     dataids = []
     datasets = []
     labels = []
     titles = []
+    curve_names = []
     for cid, curve in results.items():
+        label = f"Dataset {cid:n}, Node {curve['node']:n} {DOFS[curve['dir']]:s}"
+        x = curve["x"]["values"]
+        y = curve["y"]["values"]
+
+        # apply filter if selected
+        if butterworth > 0.:
+            y = butterworth_lowpass_filter(label, y, 1. / np.mean(x[1:] - x[:-1]), butterworth)
+            results[cid]["y"]["values"] = y
+
+        # sort signals to rpm and time signals
         if curve["y"]["label"].upper() == "RPM":
-            rpm = np.array([curve["x"]["values"], curve["y"]["values"]], dtype=float).T
+            rpm = np.array([x, y], dtype=float).T
+
         else:
             dataids.append(cid)
-            datasets.append(np.array([curve["x"]["values"], curve["y"]["values"]], dtype=float).T)
+            datasets.append(np.array([x, y], dtype=float).T)
             labels.append(f"{curve['y']['label']:s} [{curve['y']['units']:s}]")
-            titles.append(f"Dataset {cid:n}, Node {curve['node']:n} {DOFS[curve['dir']]:s}: Campbell Diagram")
+            titles.append(f"Dataset {cid:n}, Node {curve['node']:n} {DOFS[curve['dir']]:s}: Campbell Diagram\n" +
+                          f"{window:s}, L = {window_length:n} ({window_overlap * 100:.0f}%)" +
+                          (", mean remove" if remove_mean else ""))
+            curve_names.append(f"Dataset {cid:n}, Node {curve['node']:n} {DOFS[curve['dir']]:s}")
 
-    plot_lines({k: v for k, v in results.items() if k in dataids},
-               os.path.splitext(filename)[0] + "_curves.png" if (not showfig) or savefig else None)
-
-    plot_lines({k: v for k, v in results.items() if k not in dataids},
-               os.path.splitext(filename)[0] + "_rpm.png" if (not showfig) or savefig else None)
-
-    if rpm is None:
-        raise IOError(f"[-] Missing RPM data.")
-
+    # check if time signal is present
     if len(dataids) == 0:
         raise IOError(f"[-] Missing time data.")
 
+    # plot time signal
+    plot_lines({k: v for k, v in results.items() if k in dataids},
+               (os.path.splitext(filename)[0] +
+                (f"_blp{butterworth:.0f}Hz" if butterworth > 0. else "") +
+                "_curves.png") if (not showfig) or savefig else None)
+
+    # check if rpm data are present
+    if rpm is None:
+        raise IOError(f"[-] Missing RPM data.")
+
+    # plor rpm
+    plot_lines({k: v for k, v in results.items() if k not in dataids},
+               (os.path.splitext(filename)[0] +
+                (f"_blp{butterworth:.0f}Hz" if butterworth > 0. else "") +
+                "_rpm.png") if (not showfig) or savefig else None)
+
+    # process signals
     for i in range(len(dataids)):
         if (not showfig) or savefig:
-            plotname = os.path.splitext(filename)[0] + "_" + str(dataids[i]) + "_campbell.png"
+            # prepare plot name
+            plotname = f"{os.path.splitext(filename)[0]:s}_{str(dataids[i]):s}"
+            plotname += f"_{window:s}_{window_length:n}_{window_overlap*100:.0f}%"
+            plotname += f"_{max_freq:.0f}Hz"
+            plotname += f"_blp{butterworth:.0f}Hz" if butterworth > 0. else ""
+            plotname += "_campbell.png"
         else:
             plotname = None
         print(f"[+] creating Campbell Diagram for dataset {str(dataids[i]):s}")
-        rpms, freqs, FFT = campbell(datasets[i], rpm, window, window_length, window_overlap)
+        rpms, freqs, FFT = campbell(datasets[i], rpm, window, window_length,
+                                    window_overlap, remove_mean)
         print(f"[+] plotting Campbell Diagram for dataset {str(dataids[i]):s}")
         plot_campbell(rpms, freqs, FFT, max_freq, labels[i], titles[i], num_orders, flip_xy, plotname)
+
+    # perform order analysis
+    for i in range(len(dataids)):
+        if (not showfig) or savefig:
+            # prepare plot name
+            plotname = f"{os.path.splitext(filename)[0]:s}_{str(dataids[i]):s}"
+            plotname += f"_{window:s}_{window_length:n}_{window_overlap*100:.0f}%"
+            plotname += f"_blp{butterworth:.0f}Hz" if butterworth > 0. else ""
+            plotname += "_order_analysis.png"
+        else:
+            plotname = None
+        order_analysis(datasets[i][:,1], rpm[:,1], datasets[i][:,0], curve_names[i],
+                       window, window_length, window_overlap, remove_mean, plotname)
 
     if showfig:
         plt.show()
@@ -568,11 +801,10 @@ if __name__ == "__main__":
                         help="""Window filter type for signal processing.
 
 possible filters:
-    boxcar, triang, blackman, hann, hann, bartlett, flattop, parzen,
-    bohman, blackmanharris, nuttall, barthann, cosine, exponential, tukey,
-    taylor, lanczos
+    boxcar, triang, blackman, hann, hamming, bartlett, flattop, parzen, bohman,
+    blackmanharris, nuttall, barthann, cosine
 
-see help for scipy.signal.get_window() for more info. none == boxcar
+see help for scipy.signal.get_window() for more info.
 
 default: hann
 
@@ -601,8 +833,25 @@ default: 500.
 
 """)
 
+    parser.add_argument("-b", "--butterworth", dest="butterworth", type=float, default=-1.,
+                        help="""Apply Butterworth Lowpass Filter to the signal data before processing
+if the value is > 0. [Hz]
+
+default: -1.
+
+""")
+
+    parser.add_argument("-m", "--no_mean_removal", dest="mean_removal", action="store_false", default=True,
+                        help="""If switched then do not perform mean removal of the signal before FFT Analysis
+
+default: False
+
+""")
+
     parser.add_argument("-x", "--flip_xy", dest="flip_xy", action="store_true", default=False,
                         help="""If the diagram plot should be transposed - Frequency on X axis and RPM on Y axis.
+
+default: False
 
 """)
 
@@ -615,6 +864,8 @@ default: 3
 
     parser.add_argument("-p", "--show_plots", dest="show_plots", action="store_true", default=False,
                         help="""If the plots should be shown, default: do not show
+
+default: False
 
 """)
 
@@ -686,8 +937,28 @@ Example of input dataset 58:
 
     data_file = os.path.realpath(args.data_file)
 
-    # filename = "./res/Derotator_Stihl_2017/unv-Format/25-RunDown-336mm.unv"
-    create_campbell_diagram(filename=data_file, window=args.window, window_length=args.nperseg,
-                            window_overlap=args.overlap, max_freq=args.max_freq, flip_xy=args.flip_xy,
-                            num_orders=args.nord, showfig=args.show_plots, savefig=args.save_plots)
+    print(f"[+] Started {os.path.basename(__file__):s}")
+    print(f"      Filename:     {data_file:s}")
+    print(f"      Window:       {args.window:s}")
+    print(f"      NPERSEG:      {args.nperseg:n}")
+    print(f"      Overlap:      {args.overlap:.2f}")
+    print(f"      Max Freq:     {args.max_freq:.2f}")
+    print(f"      Filter:       " + (f"Butterworth Lowpass {args.butterworth:.2f}" if args.butterworth > 0. else "None"))
+    print(f"      Mean Removal: {str(args.mean_removal):s}")
+    print(f"      Flip X & Y:   {str(args.flip_xy):s}")
+    print(f"      N° Orders:    {args.nord:n}")
+    print(f"      Show plots:   {str(args.show_plots):s}")
+    print(f"      Save plots:   {str(args.show_plots):s}")
 
+    # filename = "./res/Derotator_Stihl_2017/unv-Format/25-RunDown-336mm.unv"
+    create_campbell_diagram(filename=data_file,
+                            window=args.window,
+                            window_length=args.nperseg,
+                            window_overlap=args.overlap,
+                            max_freq=args.max_freq,
+                            butterworth=args.butterworth,
+                            remove_mean=args.mean_removal,
+                            flip_xy=args.flip_xy,
+                            num_orders=args.nord,
+                            showfig=args.show_plots,
+                            savefig=args.save_plots)
