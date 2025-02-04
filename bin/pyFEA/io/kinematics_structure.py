@@ -230,7 +230,7 @@ class Force(RefFrame):
 
         elif form == "cylindrical":
             Fx = force[0] * np.cos(force[1])
-            Fy = force[1] * np.cos(force[2])
+            Fy = force[0] * np.sin(force[1])
             Mz = force[2]
             self.F = np.array([Fx, Fy, Mz], dtype=float)
 
